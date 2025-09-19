@@ -1,0 +1,289 @@
+{
+  "professionals": [
+    {
+      "id": "prof-001",
+      "name": "João Silva Construções",
+      "email": "joao.silva@email.com",
+      "createdAt": "2025-08-23T21:11:32.456Z",
+      "profilePhoto": "/uploads/joao-silva.jpg",
+      "id_category": "cat-obras-reformas",
+      "subcategories": [
+        "subcat-empreiteiro",
+        "subcat-mestre-obras"
+      ],
+      "city": "Goiânia",
+      "state": "GO",
+      "education": "Técnico em Edificações - SENAI",
+      "experience": "15 anos de experiência em construção civil, especializado em obras residenciais de alto padrão",
+      "tags": [
+        "residencial",
+        "comercial",
+        "reformas",
+        "alto-padrão"
+      ],
+      "portfolio": [
+        {
+          "id": "proj-001-001",
+          "title": "Residência Alto Padrão - Setor Bueno",
+          "description": "Construção completa de residência de 450m² com piscina e área gourmet.",
+          "images": [
+            "/uploads/portfolio/joao-obra-1.jpg",
+            "/uploads/portfolio/joao-obra-2.jpg",
+            "/uploads/portfolio/joao-obra-3.jpg"
+          ],
+          "completedAt": "2024-06-15",
+          "projectType": "Construção Residencial",
+          "area": "450m²",
+          "duration": "8 meses",
+          "tags": ["residencial", "alto-padrão", "construção"]
+        },
+        {
+          "id": "proj-001-002",
+          "title": "Reforma de Edifício Comercial - Centro",
+          "description": "Reforma estrutural e modernização de edifício comercial de 5 andares.",
+          "images": [
+            "/uploads/portfolio/joao-comercial-1.jpg",
+            "/uploads/portfolio/joao-comercial-2.jpg"
+          ],
+          "completedAt": "2023-11-30",
+          "projectType": "Reforma Comercial",
+          "area": "2000m²",
+          "duration": "6 meses",
+          "tags": ["comercial", "reforma", "estrutural"]
+        }
+      ],
+      "indicationsReceived": [],
+      "indicationsGiven": [
+        "prof-002"
+      ],
+      "socialMedia": {
+        "instagram": "https://instagram.com/joaosilva.construcoes",
+        "linkedin": "https://linkedin.com/in/joao-silva-construcoes",
+        "youtube": null,
+        "website": "https://joaosilva.construcoes.com.br"
+      },
+      "whatsapp": "62999887766",
+      "businessAddress": "Av. T-63, 1296 - Setor Bueno, Goiânia - GO",
+      "googleMapsLink": "https://maps.google.com/?q=Av.+T-63,+1296+-+Setor+Bueno,+Goiânia+-+GO",
+      "isActive": true
+    },
+    {
+      "id": "prof-002",
+      "name": "Maria Oliveira Arquitetura",
+      "email": "maria.arquitetura@email.com",
+      "createdAt": "2025-08-23T21:11:32.454Z",
+      "profilePhoto": "/uploads/maria-oliveira.jpg",
+      "id_category": "cat-arquitetura-design",
+      "subcategories": [
+        "subcat-arquiteto",
+        "subcat-designer-interiores",
+        "subcat-modelagem-3d"
+      ],
+      "city": "Goiânia",
+      "state": "GO",
+      "education": "Arquitetura e Urbanismo - PUC Goiás, Especialização em Design de Interiores",
+      "experience": "8 anos desenvolvendo projetos residenciais e comerciais, especializada em arquitetura moderna e sustentável",
+      "tags": [
+        "arquitetura-moderna",
+        "interiores",
+        "3D",
+        "sustentável",
+        "plantas-baixas"
+      ],
+      "portfolio": [
+        {
+          "id": "proj-002-001",
+          "title": "Projeto Residencial Sustentável",
+          "description": "Arquitetura moderna com foco em sustentabilidade, utilizando energia solar e reaproveitamento de água.",
+          "images": [
+            "/uploads/portfolio/maria-projeto-1.jpg",
+            "/uploads/portfolio/maria-projeto-2.jpg",
+            "/uploads/portfolio/maria-projeto-3.jpg"
+          ],
+          "completedAt": "2024-03-20",
+          "projectType": "Projeto Arquitetônico",
+          "area": "380m²",
+          "duration": "3 meses",
+          "tags": ["sustentável", "residencial", "moderno"]
+        },
+        {
+          "id": "proj-002-002",
+          "title": "Design de Interiores - Apartamento",
+          "description": "Transformação completa de apartamento com conceito open space e iluminação inteligente.",
+          "images": [
+            "/uploads/portfolio/maria-interior-1.jpg",
+            "/uploads/portfolio/maria-interior-2.jpg",
+            "/uploads/portfolio/maria-interior-3.jpg"
+          ],
+          "completedAt": "2024-01-10",
+          "projectType": "Design de Interiores",
+          "area": "120m²",
+          "duration": "2 meses",
+          "tags": ["interiores", "design", "moderno"]
+        }
+      ],
+      "indicationsReceived": [
+        {
+          "professionalId": "prof-001",
+          "professionalName": "João Silva Construções",
+          "email": "joao.silva@email.com",
+          "date": "2025-08-23T21:11:32.456Z"
+        }
+      ],
+      "indicationsGiven": [],
+      "socialMedia": {
+        "instagram": "https://instagram.com/maria.arquitetura",
+        "linkedin": "https://linkedin.com/in/maria-oliveira-arquiteta",
+        "youtube": "https://youtube.com/c/mariaoliveiraarquitetura",
+        "website": "https://mariaoliveira.arq.br"
+      },
+      "whatsapp": "62988776655",
+      "businessAddress": "Rua 9, 456 - Setor Oeste, Goiânia - GO",
+      "googleMapsLink": "https://maps.google.com/?q=Rua+9,+456+-+Setor+Oeste,+Goiânia+-+GO",
+      "isActive": true
+    },
+    {
+      "id": "prof-003",
+      "name": "Carlos Santos Elétrica",
+      "email": "carlos.eletrica@email.com",
+      "createdAt": "2025-03-05T09:15:00Z",
+      "profilePhoto": "/uploads/carlos-santos.jpg",
+      "id_category": "cat-eletrica",
+      "subcategories": [
+        "subcat-eletricista-residencial",
+        "subcat-eletricista-industrial",
+        "subcat-energia-solar"
+      ],
+      "city": "Goiânia",
+      "state": "GO",
+      "education": "Engenharia Elétrica - UFG, Curso NR10 - Segurança em Instalações Elétricas",
+      "experience": "12 anos em instalações elétricas, especialista em energia solar e automação residencial, certificado NR10",
+      "tags": [
+        "solar",
+        "automação",
+        "nr10",
+        "industrial",
+        "residencial"
+      ],
+      "portfolio": [
+        {
+          "id": "proj-003-001",
+          "title": "Instalação de Energia Solar - Residencial",
+          "description": "Sistema completo de 10kWp com inversor e baterias para autonomia energética.",
+          "images": [
+            "/uploads/portfolio/carlos-solar-1.jpg",
+            "/uploads/portfolio/carlos-solar-2.jpg",
+            "/uploads/portfolio/carlos-solar-3.jpg"
+          ],
+          "completedAt": "2024-05-18",
+          "projectType": "Energia Solar",
+          "area": "100m² de painéis",
+          "duration": "15 dias",
+          "tags": ["solar", "energia-renovável", "residencial"]
+        },
+        {
+          "id": "proj-003-002",
+          "title": "Automação Residencial - Casa Inteligente",
+          "description": "Projeto completo de automação com controle de iluminação, climatização e segurança.",
+          "images": [
+            "/uploads/portfolio/carlos-automacao-1.jpg",
+            "/uploads/portfolio/carlos-automacao-2.jpg"
+          ],
+          "completedAt": "2024-02-22",
+          "projectType": "Automação",
+          "area": "300m²",
+          "duration": "20 dias",
+          "tags": ["automação", "residencial", "tecnologia"]
+        }
+      ],
+      "indicationsReceived": [],
+      "indicationsGiven": [
+        "prof-004"
+      ],
+      "socialMedia": {
+        "instagram": "https://instagram.com/carlossantos.eletrica",
+        "linkedin": "https://linkedin.com/in/carlos-santos-eletricista",
+        "youtube": null,
+        "website": null
+      },
+      "whatsapp": "62977665544",
+      "businessAddress": "Av. 85, 1789 - Setor Marista, Goiânia - GO",
+      "googleMapsLink": "https://maps.google.com/?q=Av.+85,+1789+-+Setor+Marista,+Goiânia+-+GO",
+      "isActive": true
+    },
+    {
+      "id": "prof-004",
+      "name": "Ana Costa Pinturas",
+      "email": "ana.pinturas@email.com",
+      "createdAt": "2025-03-20T11:45:00Z",
+      "profilePhoto": "/uploads/ana-costa.jpg",
+      "id_category": "cat-pintura-revestimentos",
+      "subcategories": [
+        "subcat-pintura-residencial",
+        "subcat-texturas-grafiatos",
+        "subcat-revestimentos-especiais"
+      ],
+      "city": "Goiânia",
+      "state": "GO",
+      "education": "Curso Profissionalizante de Pintura - SENAC, Especialização em Texturas Decorativas",
+      "experience": "10 anos em pintura e revestimentos, especializada em texturas decorativas, grafiato e cimento queimado",
+      "tags": [
+        "grafiato",
+        "cimento-queimado",
+        "epóxi",
+        "texturas",
+        "decorativa"
+      ],
+      "portfolio": [
+        {
+          "id": "proj-004-001",
+          "title": "Aplicação de Grafiato - Edifício Comercial",
+          "description": "Grafiato de alto padrão em fachada de edifício corporativo com acabamento premium.",
+          "images": [
+            "/uploads/portfolio/ana-grafiato-1.jpg",
+            "/uploads/portfolio/ana-grafiato-2.jpg",
+            "/uploads/portfolio/ana-grafiato-3.jpg"
+          ],
+          "completedAt": "2024-04-12",
+          "projectType": "Revestimento Externo",
+          "area": "800m²",
+          "duration": "30 dias",
+          "tags": ["grafiato", "comercial", "fachada"]
+        },
+        {
+          "id": "proj-004-002",
+          "title": "Piso Epóxi - Garagem Residencial",
+          "description": "Aplicação de piso epóxi antiderrapante com acabamento personalizado.",
+          "images": [
+            "/uploads/portfolio/ana-epoxi-1.jpg",
+            "/uploads/portfolio/ana-epoxi-2.jpg"
+          ],
+          "completedAt": "2024-03-05",
+          "projectType": "Revestimento de Piso",
+          "area": "150m²",
+          "duration": "5 dias",
+          "tags": ["epóxi", "residencial", "piso"]
+        }
+      ],
+      "indicationsReceived": [
+        {
+          "professionalId": "prof-003",
+          "professionalName": "Carlos Santos Elétrica",
+          "email": "carlos.eletrica@email.com",
+          "date": "2025-03-25T14:30:00Z"
+        }
+      ],
+      "indicationsGiven": [],
+      "socialMedia": {
+        "instagram": "https://instagram.com/anacosta.pinturas",
+        "linkedin": null,
+        "youtube": null,
+        "website": null
+      },
+      "whatsapp": "62966554433",
+      "businessAddress": "Rua T-28, 890 - Setor Bueno, Goiânia - GO",
+      "googleMapsLink": "https://maps.google.com/?q=Rua+T-28,+890+-+Setor+Bueno,+Goiânia+-+GO",
+      "isActive": true
+    }
+  ]
+}

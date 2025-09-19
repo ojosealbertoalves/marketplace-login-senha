@@ -1,0 +1,28 @@
+{
+  "cities": [
+    {
+      "id": "city-goiania",
+      "name": "Goiânia",
+      "state": "GO",
+      "stateName": "Goiás",
+      "slug": "goiania",
+      "active": true
+    },
+    {
+      "id": "city-aparecida-goiania",
+      "name": "Aparecida de Goiânia",
+      "state": "GO",
+      "stateName": "Goiás",
+      "slug": "aparecida-de-goiania",
+      "active": true
+    },
+    {
+      "id": "city-senador-canedo",
+      "name": "Senador Canedo",
+      "state": "GO",
+      "stateName": "Goiás",
+      "slug": "senador-canedo",
+      "active": true
+    }
+  ]
+}

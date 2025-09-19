@@ -1,0 +1,397 @@
+{
+  "categories": [
+    {
+      "id": "cat-obras-reformas",
+      "name": "🏗️ Obras e Reformas",
+      "slug": "obras-reformas",
+      "icon": "🏗️",
+      "subcategories": [
+        {
+          "id": "subcat-pedreiro",
+          "name": "Pedreiro",
+          "slug": "pedreiro"
+        },
+        {
+          "id": "subcat-servente",
+          "name": "Servente",
+          "slug": "servente"
+        },
+        {
+          "id": "subcat-empreiteiro",
+          "name": "Empreiteiro",
+          "slug": "empreiteiro"
+        },
+        {
+          "id": "subcat-mestre-obras",
+          "name": "Mestre de obras",
+          "slug": "mestre-obras"
+        },
+        {
+          "id": "subcat-acabamentos",
+          "name": "Acabamentos (reboco, contrapiso, assentamento cerâmico)",
+          "slug": "acabamentos"
+        },
+        {
+          "id": "subcat-pisos-especiais",
+          "name": "Instalação de pisos especiais (ex: piso emborrachado, granilite)",
+          "slug": "pisos-especiais"
+        },
+        {
+          "id": "subcat-impermeabilizacao",
+          "name": "Impermeabilização",
+          "slug": "impermeabilizacao"
+        }
+      ]
+    },
+    {
+      "id": "cat-projetos-tecnicos",
+      "name": "📐 Projetos Técnicos",
+      "slug": "projetos-tecnicos",
+      "icon": "📐",
+      "subcategories": [
+        {
+          "id": "subcat-projeto-arquitetonico",
+          "name": "Projeto Arquitetônico",
+          "slug": "projeto-arquitetonico"
+        },
+        {
+          "id": "subcat-projeto-estrutural",
+          "name": "Projeto Estrutural",
+          "slug": "projeto-estrutural"
+        },
+        {
+          "id": "subcat-projeto-eletrico",
+          "name": "Projeto Elétrico",
+          "slug": "projeto-eletrico"
+        },
+        {
+          "id": "subcat-projeto-hidrossanitario",
+          "name": "Projeto Hidrossanitário",
+          "slug": "projeto-hidrossanitario"
+        },
+        {
+          "id": "subcat-projeto-gas",
+          "name": "Projeto de Gás",
+          "slug": "projeto-gas"
+        },
+        {
+          "id": "subcat-projeto-ar-condicionado",
+          "name": "Projeto de Ar Condicionado",
+          "slug": "projeto-ar-condicionado"
+        },
+        {
+          "id": "subcat-projeto-incendio",
+          "name": "Projeto de Incêndio (AVCB / Bombeiros)",
+          "slug": "projeto-incendio"
+        },
+        {
+          "id": "subcat-projeto-acessibilidade",
+          "name": "Projeto de Acessibilidade",
+          "slug": "projeto-acessibilidade"
+        }
+      ]
+    },
+    {
+      "id": "cat-arquitetura-design",
+      "name": "🏠 Arquitetura e Design",
+      "slug": "arquitetura-design",
+      "icon": "🏠",
+      "subcategories": [
+        {
+          "id": "subcat-arquiteto",
+          "name": "Arquiteto",
+          "slug": "arquiteto"
+        },
+        {
+          "id": "subcat-designer-interiores",
+          "name": "Designer de Interiores",
+          "slug": "designer-interiores"
+        },
+        {
+          "id": "subcat-paisagismo",
+          "name": "Paisagismo",
+          "slug": "paisagismo"
+        },
+        {
+          "id": "subcat-modelagem-3d",
+          "name": "Modelagem 3D e Renderização",
+          "slug": "modelagem-3d"
+        },
+        {
+          "id": "subcat-consultoria-layout",
+          "name": "Consultoria de Layout",
+          "slug": "consultoria-layout"
+        }
+      ]
+    },
+    {
+      "id": "cat-pintura-revestimentos",
+      "name": "🎨 Pintura e Revestimentos",
+      "slug": "pintura-revestimentos",
+      "icon": "🎨",
+      "subcategories": [
+        {
+          "id": "subcat-pintura-residencial",
+          "name": "Pintura Residencial",
+          "slug": "pintura-residencial"
+        },
+        {
+          "id": "subcat-pintura-comercial",
+          "name": "Pintura Comercial",
+          "slug": "pintura-comercial"
+        },
+        {
+          "id": "subcat-pintura-industrial",
+          "name": "Pintura Industrial",
+          "slug": "pintura-industrial"
+        },
+        {
+          "id": "subcat-texturas-grafiatos",
+          "name": "Texturas e Grafiatos",
+          "slug": "texturas-grafiatos"
+        },
+        {
+          "id": "subcat-revestimentos-especiais",
+          "name": "Revestimentos especiais (cimento queimado, epóxi)",
+          "slug": "revestimentos-especiais"
+        }
+      ]
+    },
+    {
+      "id": "cat-eletrica",
+      "name": "⚡ Elétrica",
+      "slug": "eletrica",
+      "icon": "⚡",
+      "subcategories": [
+        {
+          "id": "subcat-eletricista-residencial",
+          "name": "Eletricista Residencial",
+          "slug": "eletricista-residencial"
+        },
+        {
+          "id": "subcat-eletricista-industrial",
+          "name": "Eletricista Industrial",
+          "slug": "eletricista-industrial"
+        },
+        {
+          "id": "subcat-instalacao-quadros",
+          "name": "Instalação de Quadros Elétricos",
+          "slug": "instalacao-quadros"
+        },
+        {
+          "id": "subcat-automacao-residencial",
+          "name": "Automatização Residencial",
+          "slug": "automacao-residencial"
+        },
+        {
+          "id": "subcat-energia-solar",
+          "name": "Energia Solar Fotovoltaica",
+          "slug": "energia-solar"
+        }
+      ]
+    },
+    {
+      "id": "cat-hidraulica",
+      "name": "🚿 Hidráulica",
+      "slug": "hidraulica",
+      "icon": "🚿",
+      "subcategories": [
+        {
+          "id": "subcat-encanador-residencial",
+          "name": "Encanador Residencial",
+          "slug": "encanador-residencial"
+        },
+        {
+          "id": "subcat-instalacao-gas",
+          "name": "Instalação de Gás",
+          "slug": "instalacao-gas"
+        },
+        {
+          "id": "subcat-calhas-rufos",
+          "name": "Calhas e Rufos",
+          "slug": "calhas-rufos"
+        },
+        {
+          "id": "subcat-caixas-bombas",
+          "name": "Instalação de Caixas d'água e Bombas",
+          "slug": "caixas-bombas"
+        },
+        {
+          "id": "subcat-drenagem-pluvial",
+          "name": "Drenagem Pluvial",
+          "slug": "drenagem-pluvial"
+        }
+      ]
+    },
+    {
+      "id": "cat-marcenaria-carpintaria",
+      "name": "🪚 Marcenaria e Carpintaria",
+      "slug": "marcenaria-carpintaria",
+      "icon": "🪚",
+      "subcategories": [
+        {
+          "id": "subcat-marcenaria-medida",
+          "name": "Marcenaria sob medida",
+          "slug": "marcenaria-medida"
+        },
+        {
+          "id": "subcat-portas-rodapes",
+          "name": "Instalação de Portas e Rodapés",
+          "slug": "portas-rodapes"
+        },
+        {
+          "id": "subcat-moveis-planejados",
+          "name": "Móveis Planejados",
+          "slug": "moveis-planejados"
+        },
+        {
+          "id": "subcat-paineis-decorativos",
+          "name": "Painéis decorativos",
+          "slug": "paineis-decorativos"
+        }
+      ]
+    },
+    {
+      "id": "cat-serralheria-metais",
+      "name": "🔩 Serralheria e Metais",
+      "slug": "serralheria-metais",
+      "icon": "🔩",
+      "subcategories": [
+        {
+          "id": "subcat-portoes-grades",
+          "name": "Portões e Grades",
+          "slug": "portoes-grades"
+        },
+        {
+          "id": "subcat-esquadrias-metalicas",
+          "name": "Esquadrias Metálicas",
+          "slug": "esquadrias-metalicas"
+        },
+        {
+          "id": "subcat-estruturas-metalicas",
+          "name": "Estruturas Metálicas",
+          "slug": "estruturas-metalicas"
+        },
+        {
+          "id": "subcat-guarda-corpo",
+          "name": "Guarda-corpo e Corrimão",
+          "slug": "guarda-corpo"
+        }
+      ]
+    },
+    {
+      "id": "cat-regularizacao-documentacao",
+      "name": "🧾 Regularização e Documentação",
+      "slug": "regularizacao-documentacao",
+      "icon": "🧾",
+      "subcategories": [
+        {
+          "id": "subcat-aprovacao-projeto",
+          "name": "Aprovação de Projeto na Prefeitura",
+          "slug": "aprovacao-projeto"
+        },
+        {
+          "id": "subcat-alvara-construcao",
+          "name": "Alvará de Construção",
+          "slug": "alvara-construcao"
+        },
+        {
+          "id": "subcat-habite-se",
+          "name": "Habite-se",
+          "slug": "habite-se"
+        },
+        {
+          "id": "subcat-usucapiao",
+          "name": "Usucapião / Adjudicação",
+          "slug": "usucapiao"
+        },
+        {
+          "id": "subcat-laudos-tecnicos",
+          "name": "Laudos Técnicos e Perícias",
+          "slug": "laudos-tecnicos"
+        },
+        {
+          "id": "subcat-licenciamento-ambiental",
+          "name": "Licenciamento Ambiental / Sanitário",
+          "slug": "licenciamento-ambiental"
+        },
+        {
+          "id": "subcat-bombeiros-avcb",
+          "name": "Bombeiros (AVCB)",
+          "slug": "bombeiros-avcb"
+        },
+        {
+          "id": "subcat-georreferenciamento",
+          "name": "Georreferenciamento e Topografia",
+          "slug": "georreferenciamento"
+        }
+      ]
+    },
+    {
+      "id": "cat-servicos-complementares",
+      "name": "🧰 Outros Serviços Complementares",
+      "slug": "servicos-complementares",
+      "icon": "🧰",
+      "subcategories": [
+        {
+          "id": "subcat-gesseiro-drywall",
+          "name": "Gesseiro / Drywall",
+          "slug": "gesseiro-drywall"
+        },
+        {
+          "id": "subcat-telhadista",
+          "name": "Telhadista",
+          "slug": "telhadista"
+        },
+        {
+          "id": "subcat-vidraceiro",
+          "name": "Vidraceiro",
+          "slug": "vidraceiro"
+        },
+        {
+          "id": "subcat-instalador-esquadrias",
+          "name": "Instalador de Esquadrias",
+          "slug": "instalador-esquadrias"
+        },
+        {
+          "id": "subcat-instalacao-ar-condicionado",
+          "name": "Instalação de Ar Condicionado",
+          "slug": "instalacao-ar-condicionado"
+        },
+        {
+          "id": "subcat-limpeza-pos-obra",
+          "name": "Limpeza Pós-Obra",
+          "slug": "limpeza-pos-obra"
+        },
+        {
+          "id": "subcat-topografo",
+          "name": "Topógrafo",
+          "slug": "topografo"
+        },
+        {
+          "id": "subcat-marceneiro",
+          "name": "Marceneiro",
+          "slug": "marceneiro"
+        }
+      ]
+    },
+    {
+       "id": "cat-grafica",
+      "name": "🖨️ Gráfica",
+      "slug": "grafica",
+      "icon": "🖨️",
+      "subcategories": [
+        {
+          "id": "subcat-impressao-projeto",
+          "name": "Impressão de projeto",
+          "slug": "impressao-projeto"
+        },
+        {
+          "id": "subcat-placa-obra",
+          "name": "Confecção de placa de obra",
+          "slug": "placa-obra"
+        }
+      ]
+    }
+  ]
+}
