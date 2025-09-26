@@ -1,18 +1,23 @@
 // IMPORTANTE: Importar CSS primeiro
 import './Home.css';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Users, Search, AlertCircle } from 'lucide-react';
+import { Users, Search, AlertCircle, LogIn } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import { useFilters } from '../hooks/useFilters';
+import { useAuth } from '../contexts/AuthContext';
 import Filters from '../components/Filters';
 import ProfessionalCard from '../components/ProfessionalCard';
 
 const Home = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
+  
   const [professionals, setProfessionals] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [initialLoad, setInitialLoad] = useState(true); // Novo estado
+  const [initialLoad, setInitialLoad] = useState(true);
 
   const {
     filters,
@@ -30,11 +35,10 @@ const Home = () => {
 
   // Carregar dados com melhores práticas
   useEffect(() => {
-    let isMounted = true; // Previne updates se componente foi desmontado
+    let isMounted = true;
 
     const loadData = async () => {
       try {
-        // Não mostrar loading se já temos dados
         if (professionals.length === 0) {
           setLoading(true);
         }
@@ -44,7 +48,6 @@ const Home = () => {
           apiService.getCategories()
         ]);
         
-        // Só atualizar se componente ainda está montado
         if (isMounted) {
           setProfessionals(professionalsData);
           setCategories(categoriesData);
@@ -65,7 +68,6 @@ const Home = () => {
 
     loadData();
 
-    // Cleanup function
     return () => {
       isMounted = false;
     };
@@ -75,7 +77,6 @@ const Home = () => {
   const handleRetry = useCallback(() => {
     setError(null);
     setLoading(true);
-    // Forçar reload removendo dados existentes
     setProfessionals([]);
   }, []);
 
@@ -154,21 +155,44 @@ const Home = () => {
       {/* Header */}
       <header className="header-gradient">
         <div className="container py-6">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-white mb-2">
-              🏗️ Marketplace da Construção Civil
-            </h1>
-            <p className="text-gray-200 max-w-2xl mx-auto">
-              Encontre os melhores profissionais da construção civil da sua região. 
-              Conectamos você com especialistas qualificados e experientes.
-            </p>
+          <div className="flex justify-between items-center">
+            <div className="text-center flex-1">
+              <h1 className="text-3xl font-bold text-white mb-2">
+                🏗️ Marketplace da Construção Civil
+              </h1>
+              <p className="text-gray-200 max-w-2xl mx-auto">
+                Encontre os melhores profissionais da construção civil da sua região. 
+                Conectamos você com especialistas qualificados e experientes.
+              </p>
+            </div>
+            
+            {/* Botão de Login - Só aparece se não estiver logado */}
+            {!isAuthenticated && (
+              <div className="ml-4">
+                <button
+                  onClick={() => navigate('/auth')}
+                  className="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center gap-2"
+                >
+                  <LogIn size={18} />
+                  Entrar
+                </button>
+              </div>
+            )}
+            
+            {/* Status do usuário logado */}
+            {isAuthenticated && (
+              <div className="ml-4 text-white text-right">
+                <p className="text-sm">Olá, {user?.name}!</p>
+                <p className="text-xs text-blue-200">{user?.user_type}</p>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       {/* Conteúdo Principal */}
       <main className="container py-8">
-        {/* Filtros */}
+        {/* Filtros - SEMPRE VISÍVEL */}
         <section className="filters-section">
           <Filters
             filters={filters}
@@ -237,6 +261,7 @@ const Home = () => {
                 <ProfessionalCard
                   key={professional.id}
                   professional={professional}
+                  showContact={isAuthenticated} // Passa o status de autenticação
                 />
               ))}
             </div>

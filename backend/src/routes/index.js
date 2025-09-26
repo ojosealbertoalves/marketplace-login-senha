@@ -1,40 +1,48 @@
-// backend/src/routes/index.js
-import express from 'express';
+// src/routes/index.js
+import { Router } from 'express';
 
-// Importar todas as rotas
+// Rotas de autenticação (NOVAS)
+import authRoutes from './auth.js';
+import adminRoutes from './admin.js';
+
+// Rotas existentes
 import categoryRoutes from './categoryRoutes.js';
-import professionalRoutes from './professionalRoutes.js';
-import userRoutes from './userRoutes.js';
-import adminRoutes from './adminRoutes.js';
+import professionalRoutes from './professionals.js'; // 👈 NOME CORRETO!
 import cityRoutes from './cityRoutes.js';
+import userRoutes from './userRoutes.js';
 
-const router = express.Router();
+const router = Router();
 
-// Rota de teste básica
+// Rota de teste
 router.get('/test', (req, res) => {
   res.json({ 
-    message: 'API funcionando - Versão Modularizada!',
+    message: 'API funcionando com autenticação!',
     timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
     availableEndpoints: [
       'GET /api/test',
+      'POST /api/auth/register',
+      'POST /api/auth/login',
+      'GET /api/auth/profile (requires token)',
       'GET /api/categories',
       'GET /api/professionals',
-      'GET /api/professionals/:id',
-      'GET /api/users',
-      'GET /api/users/check?email=',
-      'GET /api/users/stats',
       'GET /api/cities',
-      'GET /api/cities/states',
-      'GET /api/admin'
+      'GET /api/users',
+      'GET /api/admin/stats (admin only)'
     ]
   });
 });
 
-// Usar as rotas
+// 🔐 Rotas de autenticação
+router.use('/auth', authRoutes);
+
+// 👑 Rotas administrativas
+router.use('/admin', adminRoutes);
+
+// 📂 Rotas públicas existentes
 router.use('/categories', categoryRoutes);
 router.use('/professionals', professionalRoutes);
-router.use('/users', userRoutes);
 router.use('/cities', cityRoutes);
-router.use('/admin', adminRoutes);
+router.use('/users', userRoutes);
 
 export default router;

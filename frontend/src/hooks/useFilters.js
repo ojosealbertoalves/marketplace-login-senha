@@ -1,26 +1,42 @@
+// frontend/src/hooks/useFilters.js - CORRIGIDO
 import { useState, useMemo } from 'react';
 
-export const useFilters = (professionals, categories) => {
+export const useFilters = (professionals = [], categories = []) => {
   const [filters, setFilters] = useState({
-    name: '',
-    category: '', // Agora vai armazenar o ID da categoria
+    search: '',
+    category: '',
     subcategory: '',
     state: '',
     city: ''
   });
 
+  // Garantir que os dados sejam arrays
+  const safeProfessionals = useMemo(() => {
+    if (!professionals) return [];
+    if (Array.isArray(professionals)) return professionals;
+    if (professionals.data && Array.isArray(professionals.data)) return professionals.data;
+    return [];
+  }, [professionals]);
+
+  const safeCategories = useMemo(() => {
+    if (!categories) return [];
+    if (Array.isArray(categories)) return categories;
+    if (categories.data && Array.isArray(categories.data)) return categories.data;
+    return [];
+  }, [categories]);
+
   const updateFilter = (key, value) => {
     setFilters(prev => ({
       ...prev,
       [key]: value,
-      ...(key === 'category' && { subcategory: '' }), // Limpa subcategoria quando muda categoria
-      ...(key === 'state' && { city: '' }) // Limpa cidade quando muda estado
+      // Limpar subcategoria quando categoria muda
+      ...(key === 'category' && { subcategory: '' })
     }));
   };
 
   const clearFilters = () => {
     setFilters({
-      name: '',
+      search: '',
       category: '',
       subcategory: '',
       state: '',
@@ -28,101 +44,96 @@ export const useFilters = (professionals, categories) => {
     });
   };
 
-  // Obter subcategorias da categoria selecionada
-  const availableSubcategories = useMemo(() => {
-    if (!filters.category || !categories) return [];
-    
-    // Encontrar a categoria pelo ID
-    const selectedCategory = categories.find(cat => cat.id === filters.category);
-    return selectedCategory ? selectedCategory.subcategories || [] : [];
-  }, [filters.category, categories]);
-
-  // Obter estados únicos dos profissionais
-  const availableStates = useMemo(() => {
-    if (!professionals) return [];
-    const states = [...new Set(professionals.map(prof => prof.state).filter(Boolean))];
-    return states.sort();
-  }, [professionals]);
-
-  // Obter cidades do estado selecionado
-  const availableCities = useMemo(() => {
-    if (!professionals || !filters.state) return [];
-    const cities = professionals
-      .filter(prof => prof.state === filters.state)
-      .map(prof => prof.city)
-      .filter(Boolean);
-    return [...new Set(cities)].sort();
-  }, [professionals, filters.state]);
-
-  // Função auxiliar para encontrar categoria por ID
-  const getCategoryById = (categoryId) => {
-    return categories?.find(cat => cat.id === categoryId);
-  };
-
-  // Filtrar profissionais baseado nos filtros ativos
+  // Profissionais filtrados
   const filteredProfessionals = useMemo(() => {
-    if (!professionals) return [];
-
-    return professionals.filter(professional => {
-      // Filtro por nome
-      if (filters.name && !professional.name.toLowerCase().includes(filters.name.toLowerCase())) {
-        return false;
+    return safeProfessionals.filter(professional => {
+      // Filtro de busca
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const matchesName = professional.name?.toLowerCase().includes(searchLower);
+        const matchesCategory = professional.category?.toLowerCase().includes(searchLower);
+        const matchesSubcategory = professional.subcategory?.toLowerCase().includes(searchLower);
+        const matchesDescription = professional.description?.toLowerCase().includes(searchLower);
+        
+        if (!matchesName && !matchesCategory && !matchesSubcategory && !matchesDescription) {
+          return false;
+        }
       }
 
-      // Filtro por categoria - Comparar usando o nome da categoria
+      // Filtro de categoria
       if (filters.category) {
-        const selectedCategory = getCategoryById(filters.category);
-        if (!selectedCategory) return false;
-        
-        // Comparar com o nome da categoria que vem da API
-        const categoryNameFromAPI = professional.category;
-        const selectedCategoryName = selectedCategory.nameWithIcon || selectedCategory.name;
-        
-        if (categoryNameFromAPI !== selectedCategoryName) {
-          return false;
-        }
+        // Buscar pela categoria atual ou pelo categoryId
+        const matchesCategory = professional.category === filters.category || 
+                              professional.categoryId === filters.category ||
+                              professional.category_id === filters.category;
+        if (!matchesCategory) return false;
       }
 
-      // Filtro por subcategoria
+      // Filtro de subcategoria - CORRIGIDO
       if (filters.subcategory) {
-        let hasSubcategory = false;
+        // Verificar se o professional tem essa subcategoria
+        const hasSubcategory = 
+          professional.subcategory === filters.subcategory ||
+          (professional.subcategories && Array.isArray(professional.subcategories) && 
+           professional.subcategories.some(sub => 
+             sub === filters.subcategory || 
+             sub.id === filters.subcategory || 
+             sub.name === filters.subcategory
+           ));
         
-        // Verificar se existe no array de subcategorias (novo formato)
-        if (professional.subcategories && Array.isArray(professional.subcategories)) {
-          hasSubcategory = professional.subcategories.some(sub => {
-            // Pode ser objeto ou string
-            const subName = typeof sub === 'object' ? sub.name : sub;
-            return subName === filters.subcategory;
-          });
-        }
-        
-        // Verificar formato legado (campo subcategory único)
-        if (!hasSubcategory && professional.subcategory === filters.subcategory) {
-          hasSubcategory = true;
-        }
-        
-        if (!hasSubcategory) {
-          return false;
-        }
+        if (!hasSubcategory) return false;
       }
 
-      // Filtro por estado
+      // Filtro de estado
       if (filters.state && professional.state !== filters.state) {
         return false;
       }
 
-      // Filtro por cidade
+      // Filtro de cidade
       if (filters.city && professional.city !== filters.city) {
         return false;
       }
 
       return true;
     });
-  }, [professionals, filters, categories]);
+  }, [safeProfessionals, filters]);
 
-  const hasActiveFilters = useMemo(() => {
-    return Object.values(filters).some(value => value !== '');
-  }, [filters]);
+  // Subcategorias disponíveis baseadas na categoria selecionada
+  const availableSubcategories = useMemo(() => {
+    if (!filters.category) return [];
+    
+    const selectedCategory = safeCategories.find(cat => 
+      cat.id === filters.category || cat.name === filters.category
+    );
+    
+    return selectedCategory?.subcategories || [];
+  }, [safeCategories, filters.category]);
+
+  // Estados únicos dos profissionais
+  const availableStates = useMemo(() => {
+    const states = safeProfessionals
+      .map(p => p.state)
+      .filter(Boolean)
+      .filter((state, index, self) => self.indexOf(state) === index)
+      .sort();
+    return states;
+  }, [safeProfessionals]);
+
+  // Cidades únicas baseadas no estado selecionado
+  const availableCities = useMemo(() => {
+    const professionalsInState = filters.state 
+      ? safeProfessionals.filter(p => p.state === filters.state)
+      : safeProfessionals;
+    
+    const cities = professionalsInState
+      .map(p => p.city)
+      .filter(Boolean)
+      .filter((city, index, self) => self.indexOf(city) === index)
+      .sort();
+    return cities;
+  }, [safeProfessionals, filters.state]);
+
+  const hasActiveFilters = Object.values(filters).some(value => value !== '');
 
   return {
     filters,
@@ -132,7 +143,6 @@ export const useFilters = (professionals, categories) => {
     availableSubcategories,
     availableStates,
     availableCities,
-    hasActiveFilters,
-    getCategoryById // Exportar para uso no componente se necessário
+    hasActiveFilters
   };
 };

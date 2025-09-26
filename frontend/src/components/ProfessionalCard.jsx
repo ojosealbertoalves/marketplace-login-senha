@@ -1,59 +1,38 @@
-// Importar CSS no topo
-import './ProfessionalCard.css';
+// frontend/src/components/ProfessionalCard.jsx - SEM ÍCONE DE CHAVE
 import React from 'react';
-import { MapPin, Calendar, User, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { MapPin, Eye } from 'lucide-react';
+import './ProfessionalCard.css';
 
 const ProfessionalCard = ({ professional }) => {
   const navigate = useNavigate();
 
-  const handleCardClick = () => {
-    navigate(`/professional/${professional.id}`);
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
-  };
-
   const getCategoryIcon = (category) => {
     const iconMap = {
       'Obras e Reformas': '🏗️',
-      'Projetos Técnicos': '📐',
-      'Arquitetura e Design': '🏠',
+      'Arquitetura e Design': '🏠', 
       'Pintura e Revestimentos': '🎨',
       'Elétrica': '⚡',
       'Hidráulica': '🚿',
       'Marcenaria e Carpintaria': '🪚',
       'Serralheria e Metais': '🔩',
-      'Regularização e Documentação': '🧾',
-      'Outros Serviços Complementares': '🧰',
-      'Gráfica': '🖨️'
+      'Regularização e Documentação': '📋',
+      'Outros Serviços': '🔧'
     };
     return iconMap[category] || '🔧';
   };
 
+  const handleViewProfile = () => {
+    navigate(`/professional/${professional.id}`);
+  };
+
   return (
-    <div 
-      className="professional-card"
-      onClick={handleCardClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleCardClick();
-        }
-      }}
-      aria-label={`Ver perfil de ${professional.name}`}
-    >
-      {/* Header com foto e informações básicas */}
-      <div className="card-header">
-        <div className="avatar-container">
+    <div className="professional-card">
+      <div className="professional-card-header">
+        <div className="professional-avatar">
           <img
             src={professional.photo || '/placeholder-user.jpg'}
-            alt={`Foto de ${professional.name}`}
-            className="professional-avatar"
+            alt={professional.name}
             onError={(e) => {
               e.target.src = '/placeholder-user.jpg';
             }}
@@ -61,97 +40,78 @@ const ProfessionalCard = ({ professional }) => {
         </div>
         
         <div className="professional-info">
-          <h3 className="professional-name">
-            {professional.name}
-          </h3>
+          <h3 className="professional-name">{professional.name}</h3>
           
-          <div className="category-section">
+          {/* Categoria principal */}
+          <div className="professional-category">
             <span className="category-icon">
               {getCategoryIcon(professional.category)}
             </span>
-            <span className="subcategory-text">
-              {professional.subcategory}
-            </span>
+            <div className="category-info">
+              <span className="category-main">{professional.category}</span>
+              {professional.subcategory && (
+                <span className="category-sub">{professional.subcategory}</span>
+              )}
+            </div>
           </div>
           
-          <div className="location-section">
-            <MapPin className="location-icon" />
-            <span className="location-text">
-              {professional.city}, {professional.state}
-            </span>
+          {/* Subcategorias adicionais */}
+          {professional.subcategories && professional.subcategories.length > 0 && (
+            <div className="subcategories-list">
+              {professional.subcategories.slice(0, 2).map((sub, index) => (
+                <span key={index} className="subcategory-tag">
+                  {typeof sub === 'object' ? sub.name : sub}
+                </span>
+              ))}
+              {professional.subcategories.length > 2 && (
+                <span className="subcategory-more">
+                  +{professional.subcategories.length - 2} mais
+                </span>
+              )}
+            </div>
+          )}
+          
+          <div className="professional-location">
+            <MapPin size={14} />
+            <span>{professional.city}, {professional.state}</span>
           </div>
         </div>
       </div>
-
-      {/* Indicação (se houver) */}
-      {professional.referredBy && (
-        <div className="referral-section">
-          <div className="referral-content">
-            <User className="referral-icon" />
-            <span className="referral-label">
-              Indicado por:
-            </span>
-            <span className="referral-name">
-              {professional.referredBy}
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Tags */}
       {professional.tags && professional.tags.length > 0 && (
-        <div className="tags-section">
-          <div className="tags-header">
-            <Tag className="tags-icon" />
-            <span className="tags-label">Especialidades:</span>
-          </div>
-          <div className="tags-container">
-            {professional.tags.slice(0, 3).map((tag, index) => (
-              <span
-                key={index}
-                className="tag-item"
-                title={tag}
-              >
-                {tag}
-              </span>
-            ))}
-            {professional.tags.length > 3 && (
-              <span 
-                className="tag-item tag-more"
-                title={`${professional.tags.length - 3} especialidades adicionais`}
-              >
-                +{professional.tags.length - 3} mais
-              </span>
-            )}
-          </div>
+        <div className="professional-tags">
+          {professional.tags.slice(0, 3).map((tag, index) => (
+            <span key={index} className="tag">
+              {tag}
+            </span>
+          ))}
+          {professional.tags.length > 3 && (
+            <span className="tag-more">
+              +{professional.tags.length - 3}
+            </span>
+          )}
         </div>
       )}
 
-      {/* Experiência (resumida) */}
-      <div className="experience-section">
-        <p className="experience-text">
-          {professional.experience}
+      {/* Descrição */}
+      {professional.description && (
+        <p className="professional-description">
+          {professional.description.length > 100
+            ? `${professional.description.substring(0, 100)}...`
+            : professional.description
+          }
         </p>
-      </div>
+      )}
 
-      {/* Footer com data de cadastro */}
-      <div className="card-footer">
-        <div className="registration-date">
-          <Calendar className="calendar-icon" />
-          <span className="date-text">
-            Desde {formatDate(professional.registrationDate)}
-          </span>
-        </div>
-        
-        <button 
-          className="view-profile-button"
-          onClick={(e) => {
-            e.stopPropagation(); // Evita conflito com o click do card
-            handleCardClick();
-          }}
-          aria-label={`Ver perfil completo de ${professional.name}`}
+      {/* Botão ver perfil */}
+      <div className="professional-actions">
+        <button
+          onClick={handleViewProfile}
+          className="view-profile-btn"
         >
-          Ver perfil →
+          <Eye size={16} />
+          Ver Perfil Completo
         </button>
       </div>
     </div>
