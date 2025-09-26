@@ -1,14 +1,71 @@
-// src/models/User.js
+// src/models/User.js - VERSÃO ATUALIZADA
 import { Model } from 'sequelize';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 export default (sequelize, DataTypes) => {
   class User extends Model {
     static associate(models) {
-      // Um usuário pode ter muitos orçamentos
-      // User.hasMany(models.Budget, {
-      //   foreignKey: 'user_id',
-      //   as: 'budgets'
-      // });
+      // Relacionamento opcional com Professional (quando user_type = 'professional')
+      User.hasOne(models.Professional, {
+        foreignKey: 'user_id',
+        as: 'professionalProfile'
+      });
+      
+      // Relacionamento opcional com Company (quando user_type = 'company')
+      User.hasOne(models.Company, {
+        foreignKey: 'user_id',
+        as: 'companyProfile'
+      });
+    }
+
+    // Método para validar senha
+    async validatePassword(password) {
+      return await bcrypt.compare(password, this.password);
+    }
+
+    // Método para gerar JWT token
+    generateToken() {
+      return jwt.sign(
+        { 
+          id: this.id, 
+          email: this.email, 
+          userType: this.user_type,
+          name: this.name 
+        },
+        process.env.JWT_SECRET || 'seu-jwt-secret-aqui',
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      );
+    }
+
+    // Método para verificar permissões
+    hasPermission(action) {
+      const permissions = {
+        'admin': [
+          'view_all_users',
+          'create_categories',
+          'delete_categories',
+          'create_cities',
+          'delete_cities',
+          'delete_users',
+          'view_all_data'
+        ],
+        'professional': [
+          'view_own_profile',
+          'edit_own_profile',
+          'indicate_professionals',
+          'view_contact_info'
+        ],
+        'company': [
+          'view_own_profile',
+          'edit_own_profile',
+          'indicate_professionals',
+          'view_contact_info',
+          'create_job_openings' // para futuro
+        ]
+      };
+
+      return permissions[this.user_type]?.includes(action) || false;
     }
   }
   
@@ -33,6 +90,12 @@ export default (sequelize, DataTypes) => {
     password: {
       type: DataTypes.STRING,
       allowNull: false
+    },
+    // NOVO CAMPO: Tipo de usuário
+    user_type: {
+      type: DataTypes.ENUM('admin', 'professional', 'company'),
+      allowNull: false,
+      defaultValue: 'professional'
     },
     phone: {
       type: DataTypes.STRING,
@@ -63,13 +126,35 @@ export default (sequelize, DataTypes) => {
     email_verification_token: {
       type: DataTypes.STRING,
       allowNull: true
+    },
+    // NOVO CAMPO: Token para reset de senha
+    reset_password_token: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    reset_password_expires: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
     sequelize,
     modelName: 'User',
     tableName: 'users',
     timestamps: true,
-    underscored: true
+    underscored: true,
+    hooks: {
+      // Hash da senha antes de salvar
+      beforeCreate: async (user) => {
+        if (user.password) {
+          user.password = await bcrypt.hash(user.password, 12);
+        }
+      },
+      beforeUpdate: async (user) => {
+        if (user.changed('password')) {
+          user.password = await bcrypt.hash(user.password, 12);
+        }
+      }
+    }
   });
   
   return User;

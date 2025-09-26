@@ -1,9 +1,15 @@
-// src/models/Professional.js
+// src/models/Professional.js - VERSÃO ATUALIZADA
 import { Model } from 'sequelize';
 
 export default (sequelize, DataTypes) => {
   class Professional extends Model {
     static associate(models) {
+      // NOVO: Um profissional pertence a um usuário
+      Professional.belongsTo(models.User, {
+        foreignKey: 'user_id',
+        as: 'user'
+      });
+      
       // Um profissional pertence a uma categoria
       Professional.belongsTo(models.Category, {
         foreignKey: 'category_id',
@@ -13,7 +19,7 @@ export default (sequelize, DataTypes) => {
       // Um profissional pertence a uma cidade
       Professional.belongsTo(models.City, {
         foreignKey: 'city_id',
-        as: 'cityRelation'  // Mudamos de 'city' para 'cityRelation' para evitar conflito
+        as: 'cityRelation'
       });
       
       // Relacionamento many-to-many com subcategorias
@@ -49,6 +55,16 @@ export default (sequelize, DataTypes) => {
       primaryKey: true,
       allowNull: false
     },
+    // NOVO CAMPO: Relacionamento com User
+    user_id: {
+      type: DataTypes.UUID,
+      allowNull: true, // Permitir null para compatibilidade com dados existentes
+      unique: true,
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
     name: {
       type: DataTypes.STRING,
       allowNull: false
@@ -81,7 +97,6 @@ export default (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    // Campos do seu JSON
     city: {
       type: DataTypes.STRING,
       allowNull: true
@@ -90,7 +105,7 @@ export default (sequelize, DataTypes) => {
       type: DataTypes.STRING(2),
       allowNull: true
     },
-    education: {
+    description: {
       type: DataTypes.TEXT,
       allowNull: true
     },
@@ -98,19 +113,27 @@ export default (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true
     },
+    education: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
     tags: {
-      type: DataTypes.JSON, // PostgreSQL suporta JSON nativo
+      type: DataTypes.JSON,
       allowNull: true,
       defaultValue: []
+    },
+    phone: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    whatsapp: {
+      type: DataTypes.STRING,
+      allowNull: true
     },
     social_media: {
       type: DataTypes.JSON,
       allowNull: true,
       defaultValue: {}
-    },
-    whatsapp: {
-      type: DataTypes.STRING,
-      allowNull: true
     },
     business_address: {
       type: DataTypes.TEXT,
