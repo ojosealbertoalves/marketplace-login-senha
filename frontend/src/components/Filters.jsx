@@ -36,18 +36,18 @@ const Filters = ({
       </div>
 
       <div className="filters-grid">
-        {/* Filtro por Nome */}
-        <div className={`filter-field ${filters.name ? 'has-value' : ''}`}>
-          <label className="filter-label" htmlFor="name-filter">
+        {/* Filtro por Nome - CORRIGIDO: usar search em vez de name */}
+        <div className={`filter-field ${filters.search ? 'has-value' : ''}`}>
+          <label className="filter-label" htmlFor="search-filter">
             Nome do Profissional
           </label>
           <div className="search-input-container">
             <Search className="search-icon" />
             <input
-              id="name-filter"
+              id="search-filter"
               type="text"
-              value={filters.name}
-              onChange={(e) => updateFilter('name', e.target.value)}
+              value={filters.search}
+              onChange={(e) => updateFilter('search', e.target.value)}
               placeholder="Buscar por nome..."
               className="input-field"
               autoComplete="off"

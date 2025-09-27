@@ -1,4 +1,4 @@
-// frontend/src/contexts/AuthContext.jsx - VERSÃO CORRIGIDA
+// frontend/src/contexts/AuthContext.jsx - VERSÃO FINAL
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
@@ -32,17 +32,8 @@ export const AuthProvider = ({ children }) => {
           });
 
           if (response.ok) {
-            // Verificar se a resposta tem conteúdo JSON
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-              const data = await response.json();
-              setToken(savedToken);
-              setUser(JSON.parse(savedUser));
-            } else {
-              // Se não tem JSON, apenas considerar que o token é válido
-              setToken(savedToken);
-              setUser(JSON.parse(savedUser));
-            }
+            setToken(savedToken);
+            setUser(JSON.parse(savedUser));
           } else {
             // Token inválido - limpar storage
             localStorage.removeItem('token');

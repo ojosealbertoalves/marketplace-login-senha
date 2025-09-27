@@ -20,14 +20,19 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Award
+  Award,
+  Lock,
+  UserPlus
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import './ProfessionalProfile.css';
 
 const ProfessionalProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
+  
   const [professional, setProfessional] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -38,28 +43,11 @@ const ProfessionalProfile = () => {
     const loadProfessional = async () => {
       try {
         setLoading(true);
-        setError(null);
-        
-        // Verificar se o ID é válido
-        if (!id) {
-          throw new Error('ID do profissional não fornecido');
-        }
-
-        console.log('Carregando profissional com ID:', id);
-        
         const data = await apiService.getProfessionalById(id);
-        
-        console.log('Dados recebidos:', data);
-        
-        // Verificar se os dados são válidos
-        if (!data) {
-          throw new Error('Dados do profissional não encontrados');
-        }
-
         setProfessional(data);
       } catch (err) {
+        setError('Profissional não encontrado');
         console.error('Erro ao carregar profissional:', err);
-        setError(err.message || 'Profissional não encontrado');
       } finally {
         setLoading(false);
       }
@@ -70,82 +58,58 @@ const ProfessionalProfile = () => {
     }
   }, [id]);
 
-  // Função auxiliar para verificar se um valor existe e não é nulo/undefined
-  const safeGet = (obj, path, defaultValue = '') => {
-    try {
-      return path.split('.').reduce((o, p) => o && o[p], obj) ?? defaultValue;
-    } catch {
-      return defaultValue;
-    }
-  };
-
   const formatDate = (dateString) => {
-    if (!dateString) return 'Data não informada';
-    
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Data inválida';
-      
-      return date.toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric'
-      });
-    } catch {
-      return 'Data inválida';
-    }
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric'
+    });
   };
 
   const formatProjectDate = (dateString) => {
-    if (!dateString) return '';
-    
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return '';
-      
-      return date.toLocaleDateString('pt-BR', {
-        month: 'short',
-        year: 'numeric'
-      });
-    } catch {
-      return '';
-    }
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR', {
+      month: 'short',
+      year: 'numeric'
+    });
   };
 
   const getCategoryIcon = (category) => {
-    if (!category) return '🔧';
-    
     const iconMap = {
       'Obras e Reformas': '🏗️',
+      'Projetos Técnicos': '📐',
       'Arquitetura e Design': '🏠',
       'Pintura e Revestimentos': '🎨',
       'Elétrica': '⚡',
       'Hidráulica': '🚿',
       'Marcenaria e Carpintaria': '🪚',
       'Serralheria e Metais': '🔩',
-      'Regularização e Documentação': '📋',
-      'Outros Serviços': '🔧'
+      'Regularização e Documentação': '🧾',
+      'Outros Serviços Complementares': '🧰',
+      'Gráfica': '🖨️'
     };
     return iconMap[category] || '🔧';
   };
 
   const handleWhatsAppClick = () => {
-    const whatsapp = safeGet(professional, 'whatsapp');
-    const name = safeGet(professional, 'name');
-    
-    if (!whatsapp) {
-      alert('WhatsApp não informado para este profissional');
+    if (!isAuthenticated) {
+      alert('Faça login para entrar em contato com este profissional');
       return;
     }
 
-    const message = `Olá ${name}! Vi seu perfil no Marketplace da Construção Civil e gostaria de solicitar um orçamento.`;
-    const cleanWhatsapp = whatsapp.replace(/\D/g, '');
-    const whatsappUrl = `https://wa.me/55${cleanWhatsapp}?text=${encodeURIComponent(message)}`;
+    const message = `Olá ${professional.name}! Vi seu perfil no Marketplace da Construção Civil e gostaria de solicitar um orçamento.`;
+    const whatsappUrl = `https://wa.me/55${professional.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
 
+  const handleLoginRedirect = () => {
+    // Salvar a URL atual para retornar após o login
+    localStorage.setItem('redirectAfterLogin', window.location.pathname);
+    navigate('/login');
+  };
+
   const openProjectModal = (project) => {
-    if (!project) return;
     setSelectedProject(project);
     setCurrentImageIndex(0);
   };
@@ -156,7 +120,7 @@ const ProfessionalProfile = () => {
   };
 
   const nextImage = () => {
-    if (selectedProject?.images?.length > 0) {
+    if (selectedProject && selectedProject.images) {
       setCurrentImageIndex((prev) => 
         (prev + 1) % selectedProject.images.length
       );
@@ -164,14 +128,13 @@ const ProfessionalProfile = () => {
   };
 
   const prevImage = () => {
-    if (selectedProject?.images?.length > 0) {
+    if (selectedProject && selectedProject.images) {
       setCurrentImageIndex((prev) => 
         prev === 0 ? selectedProject.images.length - 1 : prev - 1
       );
     }
   };
 
-  // Loading state
   if (loading) {
     return (
       <div className="loading-container">
@@ -183,13 +146,14 @@ const ProfessionalProfile = () => {
     );
   }
 
-  // Error state
   if (error || !professional) {
     return (
       <div className="error-container">
         <div className="error-content">
-          <h2 className="error-title">Erro ao carregar perfil</h2>
-          <p className="error-message">{error || 'Profissional não encontrado'}</p>
+          <h2 className="error-title">Profissional não encontrado</h2>
+          <p className="error-message">
+            O profissional que você está procurando não existe ou foi removido.
+          </p>
           <button
             onClick={() => navigate('/')}
             className="btn-primary"
@@ -200,6 +164,10 @@ const ProfessionalProfile = () => {
       </div>
     );
   }
+
+  // Verificar se tem acesso às informações de contato
+  // Se professional.contactRestricted existe e é true, significa que precisa de login
+  const hasContactAccess = isAuthenticated && !professional.contactRestricted;
 
   return (
     <div className="profile-container">
@@ -226,8 +194,8 @@ const ProfessionalProfile = () => {
               <div className="profile-header-card">
                 <div className="profile-image-container">
                   <img
-                    src={safeGet(professional, 'photo') || '/placeholder-user.jpg'}
-                    alt={safeGet(professional, 'name')}
+                    src={professional.photo || '/placeholder-user.jpg'}
+                    alt={professional.name}
                     className="profile-image"
                     onError={(e) => {
                       e.target.src = '/placeholder-user.jpg';
@@ -236,154 +204,147 @@ const ProfessionalProfile = () => {
                 </div>
                 
                 <div className="profile-info">
-                  <h1 className="profile-name">
-                    {safeGet(professional, 'name') || 'Nome não informado'}
-                  </h1>
+                  <h1 className="profile-name">{professional.name}</h1>
                   
                   <div className="profile-category">
                     <span className="category-icon">
-                      {getCategoryIcon(safeGet(professional, 'category.name'))}
+                      {getCategoryIcon(professional.category)}
                     </span>
-                    <span className="category-name">
-                      {safeGet(professional, 'category.name') || 'Categoria não informada'}
-                    </span>
+                    <div>
+                      <p className="subcategory">{professional.subcategory}</p>
+                      <p className="category">{professional.category}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="profile-meta">
+                    <div className="meta-item">
+                      <MapPin size={16} />
+                      <span>{professional.city}, {professional.state}</span>
+                    </div>
+                    <div className="meta-item">
+                      <Calendar size={16} />
+                      <span>Cadastrado desde {formatDate(professional.registrationDate)}</span>
+                    </div>
                   </div>
 
-                  {/* Subcategorias */}
-                  {professional.subcategories && professional.subcategories.length > 0 && (
-                    <div className="subcategories">
-                      {professional.subcategories.map((sub, index) => (
-                        <span key={index} className="subcategory-tag">
-                          {sub.name || sub}
+                  {/* Tags */}
+                  {professional.tags && professional.tags.length > 0 && (
+                    <div className="profile-tags">
+                      {professional.tags.map((tag, index) => (
+                        <span key={index} className="tag-badge">
+                          {tag}
                         </span>
                       ))}
                     </div>
                   )}
-
-                  {/* Localização */}
-                  <div className="location-info">
-                    <MapPin size={16} />
-                    <span>
-                      {safeGet(professional, 'cityRelation.name') || safeGet(professional, 'city') || 'Cidade não informada'}, {' '}
-                      {safeGet(professional, 'cityRelation.state') || safeGet(professional, 'state') || 'Estado não informado'}
-                    </span>
-                  </div>
-
-                  {/* Data de cadastro */}
-                  <div className="registration-date">
-                    <Calendar size={16} />
-                    <span>
-                      Cadastrado em {formatDate(safeGet(professional, 'created_at'))}
-                    </span>
-                  </div>
                 </div>
               </div>
-
-              {/* Descrição */}
-              {safeGet(professional, 'description') && (
-                <div className="profile-section">
-                  <h3 className="section-title">
-                    <User size={20} />
-                    Sobre o Profissional
-                  </h3>
-                  <p className="profile-description">
-                    {professional.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Formação */}
-              {safeGet(professional, 'education') && (
-                <div className="profile-section">
-                  <h3 className="section-title">
-                    <GraduationCap size={20} />
-                    Formação
-                  </h3>
-                  <p className="education-text">
-                    {professional.education}
-                  </p>
-                </div>
-              )}
-
-              {/* Experiência */}
-              {safeGet(professional, 'experience') && (
-                <div className="profile-section">
-                  <h3 className="section-title">
-                    <Briefcase size={20} />
-                    Experiência
-                  </h3>
-                  <p className="experience-text">
-                    {professional.experience}
-                  </p>
-                </div>
-              )}
-
-              {/* Tags/Especialidades */}
-              {professional.tags && professional.tags.length > 0 && (
-                <div className="profile-section">
-                  <h3 className="section-title">
-                    <Tag size={20} />
-                    Especialidades
-                  </h3>
-                  <div className="tags-container">
-                    {professional.tags.map((tag, index) => (
-                      <span key={index} className="tag">
-                        {typeof tag === 'string' ? tag : tag.name || 'Tag'}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Projetos */}
-            {professional.projects && professional.projects.length > 0 && (
-              <div className="projects-section">
-                <h3 className="section-title">
+            {/* Indicação */}
+            {professional.referredBy && (
+              <div className="indication-card">
+                <div className="indication-header">
+                  <Award size={20} />
+                  <h3>Profissional Indicado</h3>
+                </div>
+                <p className="indication-text">
+                  Indicado por <strong>{professional.referredBy}</strong>
+                </p>
+                {professional.referralDate && (
+                  <p className="indication-date">
+                    em {formatDate(professional.referralDate)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Formação e Experiência */}
+            <div className="info-card">
+              <div className="info-section">
+                <div className="section-header">
+                  <GraduationCap size={20} />
+                  <h3>Formação</h3>
+                </div>
+                <p className="section-content">{professional.education}</p>
+              </div>
+              
+              <div className="info-section">
+                <div className="section-header">
                   <Briefcase size={20} />
-                  Projetos Realizados
-                </h3>
-                <div className="projects-grid">
-                  {professional.projects.map((project, index) => (
+                  <h3>Experiência</h3>
+                </div>
+                <p className="section-content">{professional.experience}</p>
+              </div>
+            </div>
+
+            {/* Portfolio de Projetos */}
+            {professional.portfolio && professional.portfolio.length > 0 && (
+              <div className="portfolio-card">
+                <div className="portfolio-header">
+                  <div className="section-header">
+                    <Image size={20} />
+                    <h3>Portfolio de Projetos</h3>
+                  </div>
+                  <span className="project-count">
+                    {professional.portfolio.length} {professional.portfolio.length === 1 ? 'projeto' : 'projetos'}
+                  </span>
+                </div>
+                
+                <div className="portfolio-grid">
+                  {professional.portfolio.map((project) => (
                     <div 
-                      key={index} 
+                      key={project.id} 
                       className="project-card"
                       onClick={() => openProjectModal(project)}
                     >
-                      {project.images && project.images[0] && (
-                        <div className="project-image">
-                          <img
-                            src={project.images[0]}
-                            alt={project.title || 'Projeto'}
-                            onError={(e) => {
-                              e.target.src = '/placeholder-project.jpg';
-                            }}
-                          />
-                        </div>
-                      )}
-                      <div className="project-info">
-                        <h4 className="project-title">
-                          {project.title || 'Projeto sem título'}
-                        </h4>
-                        {project.description && (
-                          <p className="project-description">
-                            {project.description}
-                          </p>
+                      <div className="project-image-container">
+                        <img
+                          src={project.images && project.images[0] ? project.images[0] : '/placeholder-project.jpg'}
+                          alt={project.title}
+                          className="project-image"
+                          onError={(e) => {
+                            e.target.src = '/placeholder-project.jpg';
+                          }}
+                        />
+                        {project.images && project.images.length > 1 && (
+                          <div className="image-count">
+                            <Image size={14} />
+                            <span>{project.images.length}</span>
+                          </div>
                         )}
-                        <div className="project-meta">
-                          {project.date && (
-                            <span className="project-date">
-                              <Calendar size={14} />
-                              {formatProjectDate(project.date)}
-                            </span>
+                      </div>
+                      
+                      <div className="project-content">
+                        <h4 className="project-title">{project.title}</h4>
+                        <p className="project-description">{project.description}</p>
+                        
+                        <div className="project-details">
+                          {project.area && (
+                            <div className="detail-item">
+                              <Ruler size={14} />
+                              <span>{project.area}</span>
+                            </div>
                           )}
-                          {project.location && (
-                            <span className="project-location">
-                              <MapPin size={14} />
-                              {project.location}
-                            </span>
+                          {project.duration && (
+                            <div className="detail-item">
+                              <Clock size={14} />
+                              <span>{project.duration}</span>
+                            </div>
+                          )}
+                          {project.completedAt && (
+                            <div className="detail-item">
+                              <Calendar size={14} />
+                              <span>{formatProjectDate(project.completedAt)}</span>
+                            </div>
                           )}
                         </div>
+                        
+                        {project.projectType && (
+                          <div className="project-type">
+                            {project.projectType}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -393,167 +354,220 @@ const ProfessionalProfile = () => {
           </div>
 
           {/* Sidebar */}
-          <div className="sidebar">
-            {/* Card de contato */}
-            <div className="contact-card">
-              <h3 className="contact-title">Solicitar Orçamento</h3>
-              
-              {safeGet(professional, 'whatsapp') ? (
-                <button
-                  onClick={handleWhatsAppClick}
-                  className="whatsapp-button"
-                >
-                  <Phone size={18} />
-                  WhatsApp: {professional.whatsapp}
-                </button>
+          <aside className="sidebar">
+            {/* Botão WhatsApp ou Prompt de Login */}
+            <div className="whatsapp-card">
+              {hasContactAccess ? (
+                <>
+                  <button
+                    onClick={handleWhatsAppClick}
+                    className="whatsapp-button"
+                  >
+                    <Phone size={20} />
+                    <span>Solicitar Orçamento</span>
+                  </button>
+                  <p className="whatsapp-text">
+                    Conversa direta via WhatsApp
+                  </p>
+                </>
               ) : (
-                <p className="no-contact">WhatsApp não informado</p>
+                <div className="login-prompt">
+                  <Lock size={24} />
+                  <h3>Contato Restrito</h3>
+                  <p>Faça login para ver as informações de contato e solicitar orçamentos</p>
+                  <button
+                    onClick={handleLoginRedirect}
+                    className="login-button"
+                  >
+                    <UserPlus size={20} />
+                    <span>Fazer Login</span>
+                  </button>
+                </div>
               )}
-
-              {/* Redes sociais */}
-              <div className="social-links">
-                {safeGet(professional, 'instagram') && (
-                  <a
-                    href={professional.instagram.startsWith('http') 
-                      ? professional.instagram 
-                      : `https://instagram.com/${professional.instagram}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="social-link instagram"
-                  >
-                    <Instagram size={16} />
-                    Instagram
-                  </a>
-                )}
-
-                {safeGet(professional, 'youtube') && (
-                  <a
-                    href={professional.youtube.startsWith('http') 
-                      ? professional.youtube 
-                      : `https://youtube.com/${professional.youtube}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="social-link youtube"
-                  >
-                    <Youtube size={16} />
-                    YouTube
-                  </a>
-                )}
-
-                {safeGet(professional, 'linkedin') && (
-                  <a
-                    href={professional.linkedin.startsWith('http') 
-                      ? professional.linkedin 
-                      : `https://linkedin.com/in/${professional.linkedin}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="social-link linkedin"
-                  >
-                    <Linkedin size={16} />
-                    LinkedIn
-                  </a>
-                )}
-
-                {safeGet(professional, 'website') && (
-                  <a
-                    href={professional.website.startsWith('http') 
-                      ? professional.website 
-                      : `https://${professional.website}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="social-link website"
-                  >
-                    <Globe size={16} />
-                    Website
-                  </a>
-                )}
-              </div>
             </div>
-          </div>
+
+            {/* Informações de Contato - Só mostra se tiver acesso */}
+            {hasContactAccess && professional.whatsapp && (
+              <div className="contact-card">
+                <h3 className="card-title">Informações de Contato</h3>
+                
+                <div className="contact-list">
+                  <div className="contact-item">
+                    <Phone size={18} />
+                    <div>
+                      <p className="contact-label">WhatsApp</p>
+                      <p className="contact-value">{professional.whatsapp}</p>
+                    </div>
+                  </div>
+                  
+                  {professional.businessAddress && (
+                    <div className="contact-item">
+                      <MapPin size={18} />
+                      <div>
+                        <p className="contact-label">Endereço</p>
+                        <p className="contact-value">{professional.businessAddress}</p>
+                        {professional.googleMapsLink && (
+                          <a
+                            href={professional.googleMapsLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="maps-link"
+                          >
+                            Ver no Google Maps
+                            <ExternalLink size={14} />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Redes Sociais - Só mostra se tiver acesso */}
+            {hasContactAccess && professional.socialLinks && Object.values(professional.socialLinks).some(link => link) && (
+              <div className="social-card">
+                <h3 className="card-title">Redes Sociais</h3>
+                
+                <div className="social-list">
+                  {professional.socialLinks.instagram && (
+                    <a
+                      href={professional.socialLinks.instagram}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="social-link"
+                    >
+                      <Instagram size={18} />
+                      <span>Instagram</span>
+                      <ExternalLink size={14} />
+                    </a>
+                  )}
+                  
+                  {professional.socialLinks.linkedin && (
+                    <a
+                      href={professional.socialLinks.linkedin}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="social-link"
+                    >
+                      <Linkedin size={18} />
+                      <span>LinkedIn</span>
+                      <ExternalLink size={14} />
+                    </a>
+                  )}
+                  
+                  {professional.socialLinks.youtube && (
+                    <a
+                      href={professional.socialLinks.youtube}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="social-link"
+                    >
+                      <Youtube size={18} />
+                      <span>YouTube</span>
+                      <ExternalLink size={14} />
+                    </a>
+                  )}
+                  
+                  {professional.socialLinks.website && (
+                    <a
+                      href={professional.socialLinks.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="social-link"
+                    >
+                      <Globe size={18} />
+                      <span>Website</span>
+                      <ExternalLink size={14} />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </aside>
         </div>
       </main>
 
-      {/* Modal de projeto */}
+      {/* Modal de Projeto */}
       {selectedProject && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" onClick={closeModal}>
               <X size={24} />
             </button>
-
-            <div className="modal-header">
-              <h2 className="modal-title">
-                {selectedProject.title || 'Projeto'}
-              </h2>
-            </div>
-
-            {selectedProject.images && selectedProject.images.length > 0 && (
-              <div className="modal-gallery">
-                <div className="gallery-main">
+            
+            <div className="modal-body">
+              {selectedProject.images && selectedProject.images.length > 0 && (
+                <div className="modal-gallery">
                   <img
                     src={selectedProject.images[currentImageIndex]}
-                    alt={`${selectedProject.title || 'Projeto'} - Imagem ${currentImageIndex + 1}`}
-                    className="gallery-image"
+                    alt={selectedProject.title}
+                    className="modal-image"
+                    onError={(e) => {
+                      e.target.src = '/placeholder-project.jpg';
+                    }}
                   />
                   
                   {selectedProject.images.length > 1 && (
                     <>
-                      <button className="gallery-nav prev" onClick={prevImage}>
+                      <button className="gallery-nav gallery-prev" onClick={prevImage}>
                         <ChevronLeft size={24} />
                       </button>
-                      <button className="gallery-nav next" onClick={nextImage}>
+                      <button className="gallery-nav gallery-next" onClick={nextImage}>
                         <ChevronRight size={24} />
                       </button>
+                      
+                      <div className="gallery-indicators">
+                        {selectedProject.images.map((_, index) => (
+                          <button
+                            key={index}
+                            className={`indicator ${index === currentImageIndex ? 'active' : ''}`}
+                            onClick={() => setCurrentImageIndex(index)}
+                          />
+                        ))}
+                      </div>
                     </>
                   )}
                 </div>
-
-                {selectedProject.images.length > 1 && (
-                  <div className="gallery-thumbs">
-                    {selectedProject.images.map((img, index) => (
-                      <button
-                        key={index}
-                        className={`thumb ${index === currentImageIndex ? 'active' : ''}`}
-                        onClick={() => setCurrentImageIndex(index)}
-                      >
-                        <img src={img} alt={`Thumb ${index + 1}`} />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="modal-body">
-              {selectedProject.description && (
-                <p className="project-modal-description">
-                  {selectedProject.description}
-                </p>
               )}
-
-              <div className="project-modal-meta">
-                {selectedProject.date && (
-                  <div className="meta-item">
-                    <Calendar size={16} />
-                    <span>{formatProjectDate(selectedProject.date)}</span>
-                  </div>
+              
+              <div className="modal-info">
+                <h2 className="modal-title">{selectedProject.title}</h2>
+                
+                {selectedProject.projectType && (
+                  <span className="modal-type">{selectedProject.projectType}</span>
                 )}
-                {selectedProject.location && (
-                  <div className="meta-item">
-                    <MapPin size={16} />
-                    <span>{selectedProject.location}</span>
-                  </div>
-                )}
-                {selectedProject.duration && (
-                  <div className="meta-item">
-                    <Clock size={16} />
-                    <span>{selectedProject.duration}</span>
-                  </div>
-                )}
-                {selectedProject.area && (
-                  <div className="meta-item">
-                    <Ruler size={16} />
-                    <span>{selectedProject.area}</span>
+                
+                <p className="modal-description">{selectedProject.description}</p>
+                
+                <div className="modal-details">
+                  {selectedProject.area && (
+                    <div className="modal-detail">
+                      <Ruler size={16} />
+                      <span>Área: {selectedProject.area}</span>
+                    </div>
+                  )}
+                  {selectedProject.duration && (
+                    <div className="modal-detail">
+                      <Clock size={16} />
+                      <span>Duração: {selectedProject.duration}</span>
+                    </div>
+                  )}
+                  {selectedProject.completedAt && (
+                    <div className="modal-detail">
+                      <Calendar size={16} />
+                      <span>Concluído em: {formatProjectDate(selectedProject.completedAt)}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {selectedProject.tags && selectedProject.tags.length > 0 && (
+                  <div className="modal-tags">
+                    {selectedProject.tags.map((tag, index) => (
+                      <span key={index} className="modal-tag">
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>

@@ -1,14 +1,23 @@
-// frontend/src/components/Header.jsx
+// frontend/src/components/Header.jsx - COM AUTENTICAÇÃO
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, User, Menu, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, User, Menu, X, LogIn, LogOut, UserPlus } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import './Header.css';
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { isAuthenticated, user, logout } = useAuth();
+  const navigate = useNavigate();
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+    setIsMobileMenuOpen(false);
   };
 
   return (
@@ -30,10 +39,31 @@ const Header = () => {
             <Link to="/como-funciona" className="nav-link">
               Como Funciona
             </Link>
-            <Link to="/cadastro-profissional" className="nav-link professional-signup">
-              <User size={18} />
-              Sou Profissional
-            </Link>
+            
+            {/* Botões de autenticação */}
+            {isAuthenticated ? (
+              <div className="auth-menu">
+                <div className="user-info">
+                  <User size={18} />
+                  <span>Olá, {user?.name?.split(' ')[0]}</span>
+                </div>
+                <button onClick={handleLogout} className="nav-link logout-button">
+                  <LogOut size={18} />
+                  Sair
+                </button>
+              </div>
+            ) : (
+              <div className="auth-buttons">
+                <Link to="/login" className="nav-link login-link">
+                  <LogIn size={18} />
+                  Entrar
+                </Link>
+                <Link to="/cadastro" className="nav-link register-link">
+                  <UserPlus size={18} />
+                  Cadastrar
+                </Link>
+              </div>
+            )}
           </nav>
 
           {/* Botão Mobile Menu */}
@@ -63,14 +93,42 @@ const Header = () => {
             >
               Como Funciona
             </Link>
-            <Link 
-              to="/cadastro-profissional" 
-              className="mobile-nav-link professional-signup"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              <User size={18} />
-              Sou Profissional
-            </Link>
+            
+            {/* Menu mobile - autenticação */}
+            {isAuthenticated ? (
+              <>
+                <div className="mobile-user-info">
+                  <User size={18} />
+                  <span>Olá, {user?.name?.split(' ')[0]}</span>
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  className="mobile-nav-link logout-mobile"
+                >
+                  <LogOut size={18} />
+                  Sair
+                </button>
+              </>
+            ) : (
+              <>
+                <Link 
+                  to="/login" 
+                  className="mobile-nav-link"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <LogIn size={18} />
+                  Entrar
+                </Link>
+                <Link 
+                  to="/cadastro" 
+                  className="mobile-nav-link register-mobile"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <UserPlus size={18} />
+                  Cadastrar
+                </Link>
+              </>
+            )}
           </div>
         )}
       </div>
