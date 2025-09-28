@@ -1,4 +1,4 @@
-// src/models/User.js - VERSÃO ATUALIZADA
+// backend/src/models/User.js - COM CAMPO DOCUMENTO
 import { Model } from 'sequelize';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -61,7 +61,7 @@ export default (sequelize, DataTypes) => {
           'edit_own_profile',
           'indicate_professionals',
           'view_contact_info',
-          'create_job_openings' // para futuro
+          'create_job_openings'
         ]
       };
 
@@ -91,7 +91,23 @@ export default (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false
     },
-    // NOVO CAMPO: Tipo de usuário
+    // ✅ NOVO CAMPO: Documento (CPF ou CNPJ)
+    documento: {
+      type: DataTypes.STRING(20), // Suporta tanto CPF (11) quanto CNPJ (14) + formatação
+      allowNull: true, // Permitir null para compatibilidade com dados existentes
+      unique: true, // Não pode ter documento duplicado
+      validate: {
+        isValidDocument(value) {
+          if (value) {
+            const cleaned = value.replace(/\D/g, '');
+            if (cleaned.length !== 11 && cleaned.length !== 14) {
+              throw new Error('Documento deve ter 11 dígitos (CPF) ou 14 dígitos (CNPJ)');
+            }
+          }
+        }
+      }
+    },
+    // Tipo de usuário
     user_type: {
       type: DataTypes.ENUM('admin', 'professional', 'company'),
       allowNull: false,
@@ -127,7 +143,6 @@ export default (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true
     },
-    // NOVO CAMPO: Token para reset de senha
     reset_password_token: {
       type: DataTypes.STRING,
       allowNull: true

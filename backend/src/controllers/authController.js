@@ -1,4 +1,4 @@
-// src/controllers/authController.js - VERSÃO FINAL COMPLETA
+// backend/src/controllers/authController.js - COM CAMPO DOCUMENTO
 import db from '../models/index.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -6,7 +6,7 @@ import crypto from 'crypto';
 
 // Função para validar CPF
 const validateCPF = (cpf) => {
-  cpf = cpf.replace(/[^\d]+/g, ''); // Remove caracteres não numéricos
+  cpf = cpf.replace(/[^\d]+/g, '');
   
   if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) {
     return false;
@@ -37,11 +37,10 @@ const validateCPF = (cpf) => {
 
 // Função para validar CNPJ
 const validateCNPJ = (cnpj) => {
-  cnpj = cnpj.replace(/[^\d]+/g, ''); // Remove caracteres não numéricos
+  cnpj = cnpj.replace(/[^\d]+/g, '');
   
   if (cnpj.length !== 14) return false;
   
-  // Elimina CNPJs conhecidos como inválidos
   if (/^(\d)\1{13}$/.test(cnpj)) return false;
   
   let length = cnpj.length - 2;
@@ -82,7 +81,7 @@ export const register = async (req, res) => {
       email,
       password,
       confirmPassword,
-      userType = 'professional', // 'professional' ou 'company'
+      userType = 'professional',
       
       // Campos específicos para profissionais
       cpf,
@@ -101,6 +100,17 @@ export const register = async (req, res) => {
       phone,
       businessAreas
     } = req.body;
+
+    console.log('🔍 Dados recebidos no backend:', {
+      name,
+      email,
+      userType,
+      category_id,
+      city,
+      state,
+      cpf: cpf ? '***FORNECIDO***' : 'NÃO FORNECIDO',
+      cnpj: cnpj ? '***FORNECIDO***' : 'NÃO FORNECIDO'
+    });
 
     // Validações básicas
     if (!name || !email || !password) {
@@ -123,7 +133,9 @@ export const register = async (req, res) => {
       });
     }
 
-    // Validações específicas por tipo de usuário
+    // ✅ VALIDAÇÃO DE DOCUMENTO (CPF/CNPJ)
+    let documento = null;
+    
     if (userType === 'professional') {
       if (!cpf) {
         return res.status(400).json({
@@ -136,6 +148,8 @@ export const register = async (req, res) => {
           error: 'CPF inválido'
         });
       }
+
+      documento = cpf.replace(/\D/g, ''); // Salvar apenas números
 
       if (!category_id) {
         return res.status(400).json({
@@ -152,16 +166,6 @@ export const register = async (req, res) => {
       if (!description || !experience || !education) {
         return res.status(400).json({
           error: 'Descrição, experiência e formação são obrigatórios para profissionais'
-        });
-      }
-
-      // Verificar se CPF já existe
-      const existingProfessional = await db.Professional.findOne({ 
-        where: { cpf: cpf.replace(/[^\d]+/g, '') } 
-      });
-      if (existingProfessional) {
-        return res.status(409).json({
-          error: 'CPF já cadastrado'
         });
       }
     }
@@ -185,51 +189,62 @@ export const register = async (req, res) => {
         });
       }
 
+      documento = cnpj.replace(/\D/g, ''); // Salvar apenas números
+
       if (!phone) {
         return res.status(400).json({
           error: 'Telefone é obrigatório para empresas'
         });
       }
+    }
 
-      // Verificar se CNPJ já existe
-      const existingCompany = await db.Company.findOne({ 
-        where: { cnpj: cnpj.replace(/[^\d]+/g, '') } 
-      });
-      if (existingCompany) {
+    // ✅ VERIFICAR SE EMAIL OU DOCUMENTO JÁ EXISTEM
+    const existingUser = await db.User.findOne({ 
+      where: { 
+        [db.Sequelize.Op.or]: [
+          { email },
+          ...(documento ? [{ documento }] : [])
+        ]
+      }
+    });
+
+    if (existingUser) {
+      if (existingUser.email === email) {
         return res.status(409).json({
-          error: 'CNPJ já cadastrado'
+          error: 'Email já cadastrado'
+        });
+      }
+      if (existingUser.documento === documento) {
+        return res.status(409).json({
+          error: userType === 'professional' ? 'CPF já cadastrado' : 'CNPJ já cadastrado'
         });
       }
     }
 
-    // Verificar se email já existe
-    const existingUser = await db.User.findOne({ where: { email } });
-    if (existingUser) {
-      return res.status(409).json({
-        error: 'Email já cadastrado'
-      });
-    }
-
-    // Criar usuário
+    // ✅ CRIAR USUÁRIO COM DOCUMENTO
     const user = await db.User.create({
       name,
       email,
       password, // Será hasheado pelo hook
+      documento, // ← NOVO: Salvar CPF/CNPJ aqui
       user_type: userType,
       phone: userType === 'company' ? phone : null,
-      city: userType === 'professional' ? city : null,
-      state: userType === 'professional' ? state : null,
+      city,
+      state,
       email_verification_token: crypto.randomBytes(32).toString('hex')
     });
 
+    console.log('✅ Usuário criado:', user.id);
+
     // Criar perfil específico baseado no tipo de usuário
     if (userType === 'professional') {
+      console.log('🔨 Criando perfil profissional...');
+      
       const professional = await db.Professional.create({
         id: `prof-${Date.now()}`,
         user_id: user.id,
         name,
         email,
-        cpf: cpf.replace(/[^\d]+/g, ''), // Salvar apenas números
         category_id,
         city,
         state,
@@ -239,36 +254,46 @@ export const register = async (req, res) => {
         is_active: true
       });
 
+      console.log('✅ Profissional criado:', professional.id);
+
       // Associar subcategorias se fornecidas
       if (subcategories && subcategories.length > 0) {
         const subcategoryObjects = await db.Subcategory.findAll({
           where: { id: subcategories }
         });
         await professional.setSubcategories(subcategoryObjects);
+        console.log('✅ Subcategorias associadas');
       }
     }
 
     if (userType === 'company') {
+      console.log('🏢 Criando perfil de empresa...');
+      
       await db.Company.create({
         user_id: user.id,
         company_name: companyName,
-        cnpj: cnpj.replace(/[^\d]+/g, ''), // Salvar apenas números
-        website: website || null,
+        cnpj: documento, // Usar o documento validado
+        website,
         email,
         phone,
-        city: city || null,
-        state: state || null,
+        city,
+        state,
         business_areas: businessAreas || []
       });
+
+      console.log('✅ Empresa criada');
     }
 
     // Gerar token
     const token = user.generateToken();
 
-    // Remover senha da resposta
+    // Remover dados sensíveis da resposta
     const userData = user.toJSON();
     delete userData.password;
     delete userData.email_verification_token;
+    delete userData.documento; // Não retornar documento por segurança
+
+    console.log('🎉 Registro completado com sucesso!');
 
     res.status(201).json({
       message: 'Usuário criado com sucesso',
@@ -277,7 +302,23 @@ export const register = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erro ao registrar usuário:', error);
+    console.error('❌ Erro ao registrar usuário:', error);
+    
+    // Tratar erro de unicidade do Sequelize
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      const field = error.errors[0]?.path;
+      if (field === 'email') {
+        return res.status(409).json({
+          error: 'Email já cadastrado'
+        });
+      }
+      if (field === 'documento') {
+        return res.status(409).json({
+          error: 'CPF/CNPJ já cadastrado'
+        });
+      }
+    }
+    
     res.status(500).json({
       error: 'Erro interno do servidor',
       details: error.message
@@ -337,12 +378,13 @@ export const login = async (req, res) => {
     // Gerar token
     const token = user.generateToken();
 
-    // Preparar dados do usuário (sem senha)
+    // Preparar dados do usuário (sem senha e documento)
     const userData = user.toJSON();
     delete userData.password;
     delete userData.email_verification_token;
     delete userData.reset_password_token;
     delete userData.reset_password_expires;
+    delete userData.documento; // Não retornar documento por segurança
 
     res.json({
       message: 'Login realizado com sucesso',
@@ -362,7 +404,7 @@ export const login = async (req, res) => {
 export const getProfile = async (req, res) => {
   try {
     const user = await db.User.findByPk(req.user.id, {
-      attributes: { exclude: ['password', 'email_verification_token', 'reset_password_token'] },
+      attributes: { exclude: ['password', 'email_verification_token', 'reset_password_token', 'documento'] },
       include: [
         {
           model: db.Professional,
@@ -408,6 +450,7 @@ export const updateProfile = async (req, res) => {
     delete updates.email_verified;
     delete updates.created_at;
     delete updates.updated_at;
+    delete updates.documento; // Documento não pode ser alterado pelo perfil
 
     // Se está tentando atualizar senha, verificar senha atual
     if (updates.password) {
@@ -436,7 +479,7 @@ export const updateProfile = async (req, res) => {
 
     // Buscar dados atualizados
     const updatedUser = await db.User.findByPk(userId, {
-      attributes: { exclude: ['password', 'email_verification_token'] }
+      attributes: { exclude: ['password', 'email_verification_token', 'documento'] }
     });
 
     res.json({
@@ -455,9 +498,6 @@ export const updateProfile = async (req, res) => {
 // 🚪 Logout (invalidar token - implementação simples)
 export const logout = async (req, res) => {
   try {
-    // Em uma implementação completa, você manteria uma blacklist de tokens
-    // Por ora, o logout é tratado no frontend removendo o token
-    
     res.json({
       message: 'Logout realizado com sucesso'
     });
@@ -472,7 +512,6 @@ export const logout = async (req, res) => {
 // ✅ Verificar se token é válido
 export const verifyToken = async (req, res) => {
   try {
-    // Se chegou até aqui, o token é válido (passou pelo middleware)
     res.json({
       valid: true,
       user: {

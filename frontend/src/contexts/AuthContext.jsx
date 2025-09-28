@@ -1,4 +1,4 @@
-// frontend/src/contexts/AuthContext.jsx - VERSÃO FINAL
+// frontend/src/contexts/AuthContext.jsx - CORRIGIDO
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
 
         if (savedToken && savedUser) {
           // Verificar se o token ainda é válido
-          const response = await fetch('http://localhost:3001/api/auth/verify', {
+          const response = await fetch('/api/auth/verify', { // ← URL CORRIGIDA
             headers: {
               'Authorization': `Bearer ${savedToken}`
             }
@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }) => {
   // Login
   const login = async (email, password) => {
     try {
-      const response = await fetch('http://localhost:3001/api/auth/login', {
+      const response = await fetch('/api/auth/login', { // ← URL CORRIGIDA
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -91,7 +91,9 @@ export const AuthProvider = ({ children }) => {
   // Registro
   const register = async (userData) => {
     try {
-      const response = await fetch('http://localhost:3001/api/auth/register', {
+      console.log('Enviando dados para registro:', userData); // DEBUG
+
+      const response = await fetch('/api/auth/register', { // ← URL CORRIGIDA
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,10 +101,13 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify(userData),
       });
 
+      console.log('Status da resposta:', response.status); // DEBUG
+
       if (!response.ok) {
         let errorMessage = 'Erro no cadastro';
         try {
           const errorData = await response.json();
+          console.error('Erro do servidor:', errorData); // DEBUG
           errorMessage = errorData.error || errorMessage;
         } catch {
           errorMessage = `Erro ${response.status}: ${response.statusText}`;
@@ -111,6 +116,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       const data = await response.json();
+      console.log('Registro bem-sucedido:', data); // DEBUG
       
       setToken(data.token);
       setUser(data.user);
@@ -127,24 +133,21 @@ export const AuthProvider = ({ children }) => {
   // Logout
   const logout = async () => {
     try {
-      // Chamar endpoint de logout se token existe
+      // Opcional: chamar endpoint de logout no servidor
       if (token) {
-        await fetch('http://localhost:3001/api/auth/logout', {
+        await fetch('/api/auth/logout', { // ← URL CORRIGIDA
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }).catch(() => {
-          // Ignorar erro no logout - pode ser que o servidor esteja offline
-          console.log('Erro no logout do servidor, mas limpando dados locais');
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         });
       }
     } catch (error) {
       console.error('Erro no logout:', error);
     } finally {
-      // Sempre limpar estado e storage
-      setUser(null);
       setToken(null);
+      setUser(null);
       localStorage.removeItem('token');
       localStorage.removeItem('user');
     }
@@ -153,7 +156,7 @@ export const AuthProvider = ({ children }) => {
   // Atualizar perfil
   const updateProfile = async (updates) => {
     try {
-      const response = await fetch('http://localhost:3001/api/auth/profile', {
+      const response = await fetch('/api/auth/profile', { // ← URL CORRIGIDA
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -163,14 +166,8 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (!response.ok) {
-        let errorMessage = 'Erro ao atualizar perfil';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } catch {
-          errorMessage = `Erro ${response.status}: ${response.statusText}`;
-        }
-        return { success: false, error: errorMessage };
+        const errorData = await response.json();
+        return { success: false, error: errorData.error };
       }
 
       const data = await response.json();

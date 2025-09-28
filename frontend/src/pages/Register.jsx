@@ -1,4 +1,4 @@
-// frontend/src/pages/Register.jsx
+// frontend/src/pages/Register.jsx - VERSÃO FINAL CORRIGIDA
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -48,6 +48,7 @@ const Register = () => {
       try {
         const categoriesData = await apiService.getCategories();
         setCategories(categoriesData);
+        console.log('Categorias carregadas:', categoriesData); // DEBUG
       } catch (error) {
         console.error('Erro ao carregar categorias:', error);
       }
@@ -228,10 +229,10 @@ const Register = () => {
         
         // Campos específicos baseado no tipo
         ...(userType === 'professional' && {
-          cpf: formData.cpf,
-          category_id: formData.categoryId,
+          cpf: formData.cpf.replace(/\D/g, ''), // Remove formatação
+          category_id: formData.categoryId, // ✅ CORRETO: categoryId -> category_id
           city: formData.city.trim(),
-          state: formData.state.trim(),
+          state: formData.state.trim().toUpperCase(), // Garantir maiúscula
           description: formData.description.trim(),
           experience: formData.experience.trim(),
           education: formData.education.trim()
@@ -239,23 +240,29 @@ const Register = () => {
         
         ...(userType === 'company' && {
           companyName: formData.companyName.trim(),
-          cnpj: formData.cnpj,
+          cnpj: formData.cnpj.replace(/\D/g, ''), // Remove formatação
           website: formData.website.trim(),
-          phone: formData.phone
+          phone: formData.phone.replace(/\D/g, '') // Remove formatação
         })
       };
 
+      console.log('🚀 Dados sendo enviados para registro:', userData); // DEBUG
+
       const result = await register(userData);
       
+      console.log('📝 Resultado do registro:', result); // DEBUG
+      
       if (result.success) {
+        console.log('✅ Cadastro realizado com sucesso!');
         navigate('/');
       } else {
+        console.error('❌ Erro no cadastro:', result.error);
         setErrors({ 
           submit: result.error || 'Erro ao criar conta' 
         });
       }
     } catch (error) {
-      console.error('Erro no cadastro:', error);
+      console.error('💥 Erro no cadastro:', error);
       setErrors({ 
         submit: 'Erro de conexão. Tente novamente.' 
       });
@@ -501,17 +508,43 @@ const Register = () => {
                   <label htmlFor="state" className="form-label">
                     Estado
                   </label>
-                  <input
-                    type="text"
+                  <select
                     id="state"
                     name="state"
                     value={formData.state}
                     onChange={handleChange}
                     className={`form-input ${errors.state ? 'error' : ''}`}
-                    placeholder="Ex: SP, RJ, MG"
                     disabled={isSubmitting}
-                    maxLength={2}
-                  />
+                  >
+                    <option value="">UF</option>
+                    <option value="AC">AC</option>
+                    <option value="AL">AL</option>
+                    <option value="AP">AP</option>
+                    <option value="AM">AM</option>
+                    <option value="BA">BA</option>
+                    <option value="CE">CE</option>
+                    <option value="DF">DF</option>
+                    <option value="ES">ES</option>
+                    <option value="GO">GO</option>
+                    <option value="MA">MA</option>
+                    <option value="MT">MT</option>
+                    <option value="MS">MS</option>
+                    <option value="MG">MG</option>
+                    <option value="PA">PA</option>
+                    <option value="PB">PB</option>
+                    <option value="PR">PR</option>
+                    <option value="PE">PE</option>
+                    <option value="PI">PI</option>
+                    <option value="RJ">RJ</option>
+                    <option value="RN">RN</option>
+                    <option value="RS">RS</option>
+                    <option value="RO">RO</option>
+                    <option value="RR">RR</option>
+                    <option value="SC">SC</option>
+                    <option value="SP">SP</option>
+                    <option value="SE">SE</option>
+                    <option value="TO">TO</option>
+                  </select>
                   {errors.state && <span className="error-text">{errors.state}</span>}
                 </div>
               </div>
@@ -545,7 +578,7 @@ const Register = () => {
                     value={formData.experience}
                     onChange={handleChange}
                     className={`form-textarea ${errors.experience ? 'error' : ''}`}
-                    placeholder="Descreva sua experiência profissional..."
+                    placeholder="Ex: 10 anos trabalhando em obras residenciais e comerciais"
                     rows="3"
                     disabled={isSubmitting}
                   />
@@ -565,7 +598,7 @@ const Register = () => {
                     value={formData.education}
                     onChange={handleChange}
                     className={`form-textarea ${errors.education ? 'error' : ''}`}
-                    placeholder="Descreva sua formação acadêmica e cursos..."
+                    placeholder="Ex: Curso técnico em construção civil, curso de NR-35"
                     rows="3"
                     disabled={isSubmitting}
                   />
