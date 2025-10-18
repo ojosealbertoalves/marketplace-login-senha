@@ -44,6 +44,7 @@ const ProfessionalProfile = () => {
       try {
         setLoading(true);
         const data = await apiService.getProfessionalById(id);
+        console.log('Dados do profissional:', data);
         setProfessional(data);
       } catch (err) {
         setError('Profissional não encontrado');
@@ -59,6 +60,7 @@ const ProfessionalProfile = () => {
   }, [id]);
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'Data não disponível';
     const date = new Date(dateString);
     return date.toLocaleDateString('pt-BR', {
       day: '2-digit',
@@ -68,6 +70,7 @@ const ProfessionalProfile = () => {
   };
 
   const formatProjectDate = (dateString) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('pt-BR', {
       month: 'short',
@@ -104,7 +107,6 @@ const ProfessionalProfile = () => {
   };
 
   const handleLoginRedirect = () => {
-    // Salvar a URL atual para retornar após o login
     localStorage.setItem('redirectAfterLogin', window.location.pathname);
     navigate('/login');
   };
@@ -166,8 +168,20 @@ const ProfessionalProfile = () => {
   }
 
   // Verificar se tem acesso às informações de contato
-  // Se professional.contactRestricted existe e é true, significa que precisa de login
   const hasContactAccess = isAuthenticated && !professional.contactRestricted;
+
+  // Extrair nome da categoria de forma segura
+  const categoryName = professional.category?.name || professional.category || 'Não especificada';
+
+  // Extrair nome da cidade de forma segura
+  const cityName = professional.cityRelation?.name || professional.city || 'Não informada';
+
+  // Extrair subcategorias de forma segura
+  const subcategoryNames = Array.isArray(professional.subcategories) && professional.subcategories.length > 0
+    ? professional.subcategories.map(sub => 
+        typeof sub === 'object' ? sub.name : sub
+      ).join(', ')
+    : professional.subcategory || 'Não especificada';
 
   return (
     <div className="profile-container">
@@ -194,11 +208,11 @@ const ProfessionalProfile = () => {
               <div className="profile-header-card">
                 <div className="profile-image-container">
                   <img
-                    src={professional.photo || '/placeholder-user.jpg'}
+                    src={professional.profile_photo || professional.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(professional.name)}&size=200&background=0D8ABC&color=fff`}
                     alt={professional.name}
                     className="profile-image"
                     onError={(e) => {
-                      e.target.src = '/placeholder-user.jpg';
+                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(professional.name)}&size=200&background=0D8ABC&color=fff`;
                     }}
                   />
                 </div>
@@ -208,22 +222,22 @@ const ProfessionalProfile = () => {
                   
                   <div className="profile-category">
                     <span className="category-icon">
-                      {getCategoryIcon(professional.category)}
+                      {getCategoryIcon(categoryName)}
                     </span>
                     <div>
-                      <p className="subcategory">{professional.subcategory}</p>
-                      <p className="category">{professional.category}</p>
+                      <p className="subcategory">{subcategoryNames}</p>
+                      <p className="category">{categoryName}</p>
                     </div>
                   </div>
                   
                   <div className="profile-meta">
                     <div className="meta-item">
                       <MapPin size={16} />
-                      <span>{professional.city}, {professional.state}</span>
+                      <span>{cityName}, {professional.state || 'N/A'}</span>
                     </div>
                     <div className="meta-item">
                       <Calendar size={16} />
-                      <span>Cadastrado desde {formatDate(professional.registrationDate)}</span>
+                      <span>Cadastrado desde {formatDate(professional.created_at || professional.registrationDate)}</span>
                     </div>
                   </div>
 
@@ -242,18 +256,18 @@ const ProfessionalProfile = () => {
             </div>
 
             {/* Indicação */}
-            {professional.referredBy && (
+            {professional.indicationsReceived && professional.indicationsReceived.length > 0 && (
               <div className="indication-card">
                 <div className="indication-header">
                   <Award size={20} />
                   <h3>Profissional Indicado</h3>
                 </div>
                 <p className="indication-text">
-                  Indicado por <strong>{professional.referredBy}</strong>
+                  Indicado por <strong>{professional.indicationsReceived[0].fromProfessional?.name || professional.referredBy || 'Outro profissional'}</strong>
                 </p>
-                {professional.referralDate && (
+                {professional.indicationsReceived[0].date && (
                   <p className="indication-date">
-                    em {formatDate(professional.referralDate)}
+                    em {formatDate(professional.indicationsReceived[0].date)}
                   </p>
                 )}
               </div>
@@ -266,7 +280,7 @@ const ProfessionalProfile = () => {
                   <GraduationCap size={20} />
                   <h3>Formação</h3>
                 </div>
-                <p className="section-content">{professional.education}</p>
+                <p className="section-content">{professional.education || 'Não informada'}</p>
               </div>
               
               <div className="info-section">
@@ -274,7 +288,7 @@ const ProfessionalProfile = () => {
                   <Briefcase size={20} />
                   <h3>Experiência</h3>
                 </div>
-                <p className="section-content">{professional.experience}</p>
+                <p className="section-content">{professional.experience || 'Não informada'}</p>
               </div>
             </div>
 
@@ -300,11 +314,11 @@ const ProfessionalProfile = () => {
                     >
                       <div className="project-image-container">
                         <img
-                          src={project.images && project.images[0] ? project.images[0] : '/placeholder-project.jpg'}
+                          src={project.images && project.images[0] ? project.images[0] : 'https://placehold.co/400x300/e2e8f0/64748b?text=Sem+Imagem'}
                           alt={project.title}
                           className="project-image"
                           onError={(e) => {
-                            e.target.src = '/placeholder-project.jpg';
+                            e.target.src = 'https://placehold.co/400x300/e2e8f0/64748b?text=Sem+Imagem';
                           }}
                         />
                         {project.images && project.images.length > 1 && (
@@ -332,17 +346,17 @@ const ProfessionalProfile = () => {
                               <span>{project.duration}</span>
                             </div>
                           )}
-                          {project.completedAt && (
+                          {project.completed_at && (
                             <div className="detail-item">
                               <Calendar size={14} />
-                              <span>{formatProjectDate(project.completedAt)}</span>
+                              <span>{formatProjectDate(project.completed_at)}</span>
                             </div>
                           )}
                         </div>
                         
-                        {project.projectType && (
+                        {project.project_type && (
                           <div className="project-type">
-                            {project.projectType}
+                            {project.project_type}
                           </div>
                         )}
                       </div>
@@ -359,16 +373,26 @@ const ProfessionalProfile = () => {
             <div className="whatsapp-card">
               {hasContactAccess ? (
                 <>
-                  <button
-                    onClick={handleWhatsAppClick}
-                    className="whatsapp-button"
-                  >
-                    <Phone size={20} />
-                    <span>Solicitar Orçamento</span>
-                  </button>
-                  <p className="whatsapp-text">
-                    Conversa direta via WhatsApp
-                  </p>
+                  {professional.whatsapp ? (
+                    <>
+                      <button
+                        onClick={handleWhatsAppClick}
+                        className="whatsapp-button"
+                      >
+                        <Phone size={20} />
+                        <span>Solicitar Orçamento</span>
+                      </button>
+                      <p className="whatsapp-text">
+                        Conversa direta via WhatsApp
+                      </p>
+                    </>
+                  ) : (
+                    <div className="login-prompt">
+                      <Phone size={24} />
+                      <h3>Sem Contato</h3>
+                      <p>Este profissional ainda não cadastrou informações de contato</p>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="login-prompt">
@@ -400,15 +424,25 @@ const ProfessionalProfile = () => {
                     </div>
                   </div>
                   
-                  {professional.businessAddress && (
+                  {professional.phone && (
+                    <div className="contact-item">
+                      <Phone size={18} />
+                      <div>
+                        <p className="contact-label">Telefone</p>
+                        <p className="contact-value">{professional.phone}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {professional.business_address && (
                     <div className="contact-item">
                       <MapPin size={18} />
                       <div>
                         <p className="contact-label">Endereço</p>
-                        <p className="contact-value">{professional.businessAddress}</p>
-                        {professional.googleMapsLink && (
+                        <p className="contact-value">{professional.business_address}</p>
+                        {professional.google_maps_link && (
                           <a
-                            href={professional.googleMapsLink}
+                            href={professional.google_maps_link}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="maps-link"
@@ -425,14 +459,14 @@ const ProfessionalProfile = () => {
             )}
 
             {/* Redes Sociais - Só mostra se tiver acesso */}
-            {hasContactAccess && professional.socialLinks && Object.values(professional.socialLinks).some(link => link) && (
+            {hasContactAccess && professional.social_media && Object.values(professional.social_media).some(link => link) && (
               <div className="social-card">
                 <h3 className="card-title">Redes Sociais</h3>
                 
                 <div className="social-list">
-                  {professional.socialLinks.instagram && (
+                  {professional.social_media.instagram && (
                     <a
-                      href={professional.socialLinks.instagram}
+                      href={professional.social_media.instagram}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="social-link"
@@ -443,9 +477,9 @@ const ProfessionalProfile = () => {
                     </a>
                   )}
                   
-                  {professional.socialLinks.linkedin && (
+                  {professional.social_media.linkedin && (
                     <a
-                      href={professional.socialLinks.linkedin}
+                      href={professional.social_media.linkedin}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="social-link"
@@ -456,9 +490,9 @@ const ProfessionalProfile = () => {
                     </a>
                   )}
                   
-                  {professional.socialLinks.youtube && (
+                  {professional.social_media.youtube && (
                     <a
-                      href={professional.socialLinks.youtube}
+                      href={professional.social_media.youtube}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="social-link"
@@ -469,9 +503,9 @@ const ProfessionalProfile = () => {
                     </a>
                   )}
                   
-                  {professional.socialLinks.website && (
+                  {professional.social_media.website && (
                     <a
-                      href={professional.socialLinks.website}
+                      href={professional.social_media.website}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="social-link"
@@ -504,7 +538,7 @@ const ProfessionalProfile = () => {
                     alt={selectedProject.title}
                     className="modal-image"
                     onError={(e) => {
-                      e.target.src = '/placeholder-project.jpg';
+                      e.target.src = 'https://placehold.co/800x600/e2e8f0/64748b?text=Sem+Imagem';
                     }}
                   />
                   
@@ -534,8 +568,8 @@ const ProfessionalProfile = () => {
               <div className="modal-info">
                 <h2 className="modal-title">{selectedProject.title}</h2>
                 
-                {selectedProject.projectType && (
-                  <span className="modal-type">{selectedProject.projectType}</span>
+                {selectedProject.project_type && (
+                  <span className="modal-type">{selectedProject.project_type}</span>
                 )}
                 
                 <p className="modal-description">{selectedProject.description}</p>
@@ -553,10 +587,10 @@ const ProfessionalProfile = () => {
                       <span>Duração: {selectedProject.duration}</span>
                     </div>
                   )}
-                  {selectedProject.completedAt && (
+                  {selectedProject.completed_at && (
                     <div className="modal-detail">
                       <Calendar size={16} />
-                      <span>Concluído em: {formatProjectDate(selectedProject.completedAt)}</span>
+                      <span>Concluído em: {formatProjectDate(selectedProject.completed_at)}</span>
                     </div>
                   )}
                 </div>

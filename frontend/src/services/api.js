@@ -54,24 +54,43 @@ export const apiService = {
   
   // Buscar todos os profissionais
   getProfessionals: async () => {
-    try {
-      const response = await api.get('/professionals');
-      return response.data;
-    } catch (err) {
-      throw new Error('Erro ao buscar profissionais');
-    }
-  },
+  try {
+    const token = localStorage.getItem('token');
+    const config = token ? {
+      headers: { 'Authorization': `Bearer ${token}` }
+    } : {};
+    
+    const response = await api.get('/professionals', config);
+    
+    // Retorna só o array de profissionais
+    return response.data.data; // ← Correção aqui também
+  } catch (err) {
+    throw new Error('Erro ao buscar profissionais');
+  }
+},
 
   // Buscar profissional por ID
-  getProfessionalById: async (id) => {
-    try {
-      const response = await api.get(`/professionals/${id}`);
-      return response.data;
-    } catch (err) {
-      throw new Error('Erro ao buscar profissional');
-    }
-  },
-
+ 
+getProfessionalById: async (id) => {
+  try {
+    // Adicionar token se existir
+    const token = localStorage.getItem('token');
+    const config = token ? {
+      headers: { 'Authorization': `Bearer ${token}` }
+    } : {};
+    
+    const response = await api.get(`/professionals/${id}`, config);
+    
+    // A API retorna { success: true, data: {...}, meta: {...} }
+    // Então precisamos retornar response.data.data
+    console.log('Resposta da API:', response.data);
+    
+    return response.data.data; // ← Retorna só os dados
+  } catch (err) {
+    console.error('Erro ao buscar profissional:', err);
+    throw new Error('Erro ao buscar profissional');
+  }
+},
   // Buscar todas as categorias
   getCategories: async () => {
     try {
