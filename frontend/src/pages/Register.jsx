@@ -1,143 +1,141 @@
-// frontend/src/pages/Register.jsx - VERSÃO FINAL CORRIGIDA
+// frontend/src/pages/Register.jsx - COM CLIENTE FINAL
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Eye, EyeOff, Lock, Mail, User, UserPlus, AlertCircle, Building, 
-  MapPin, FileText, GraduationCap, Briefcase 
-} from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { apiService } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import { User, Building, Eye, EyeOff, AlertCircle, UserCircle } from 'lucide-react';
+import { register } from '../services/api';
 import './Register.css';
 
-const Register = () => {
-  const [userType, setUserType] = useState('professional'); // professional ou company
+function Register() {
+  const navigate = useNavigate();
+  const [userType, setUserType] = useState('professional');
   const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [errors, setErrors] = useState({});
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
     
-    // Campos específicos para profissional
+    // Profissional
     cpf: '',
     categoryId: '',
+    subcategoryIds: [],
     city: '',
     state: '',
     description: '',
     experience: '',
     education: '',
     
-    // Campos específicos para empresa
+    // Empresa
     companyName: '',
     cnpj: '',
     website: '',
     phone: ''
   });
-  
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [errors, setErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { register, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-
-  // Carregar categorias para profissionais
   useEffect(() => {
-    const loadCategories = async () => {
+    const fetchCategories = async () => {
       try {
-        const categoriesData = await apiService.getCategories();
-        setCategories(categoriesData);
-        console.log('Categorias carregadas:', categoriesData); // DEBUG
+        const response = await fetch('http://localhost:3001/api/categories');
+        const data = await response.json();
+        setCategories(data.data || []);
       } catch (error) {
         console.error('Erro ao carregar categorias:', error);
       }
     };
 
-    if (userType === 'professional') {
-      loadCategories();
-    }
-  }, [userType]);
+    fetchCategories();
+  }, []);
 
-  // Redirecionar se já estiver logado
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/');
+    if (formData.categoryId) {
+      const fetchSubcategories = async () => {
+        try {
+          const response = await fetch(
+            `http://localhost:3001/api/subcategories?category_id=${formData.categoryId}`
+          );
+          const data = await response.json();
+          setSubcategories(data.data || []);
+        } catch (error) {
+          console.error('Erro ao carregar subcategorias:', error);
+        }
+      };
+      fetchSubcategories();
     }
-  }, [isAuthenticated, navigate]);
+  }, [formData.categoryId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    // Formatação de CPF e CNPJ
-    let formattedValue = value;
-    if (name === 'cpf') {
-      formattedValue = formatCPF(value);
-    } else if (name === 'cnpj') {
-      formattedValue = formatCNPJ(value);
-    } else if (name === 'phone') {
-      formattedValue = formatPhone(value);
-    }
-    
     setFormData(prev => ({
       ...prev,
-      [name]: formattedValue
+      [name]: value
     }));
     
-    // Limpar erro do campo quando usuário começar a digitar
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
-  // Formatação de CPF
   const formatCPF = (value) => {
-    const cleaned = value.replace(/\D/g, '');
-    const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,3})(\d{0,2})$/);
-    if (match) {
-      return [match[1], match[2], match[3], match[4]]
-        .filter(Boolean)
-        .join('.')
-        .replace(/\.(\d{2})$/, '-$1');
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 11) {
+      return numbers
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
     }
-    return cleaned;
+    return value;
   };
 
-  // Formatação de CNPJ
   const formatCNPJ = (value) => {
-    const cleaned = value.replace(/\D/g, '');
-    const match = cleaned.match(/^(\d{0,2})(\d{0,3})(\d{0,3})(\d{0,4})(\d{0,2})$/);
-    if (match) {
-      return [match[1], match[2], match[3], match[4], match[5]]
-        .filter(Boolean)
-        .join('.')
-        .replace(/\.(\d{4})\.(\d{2})$/, '/$1-$2');
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 14) {
+      return numbers
+        .replace(/(\d{2})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1/$2')
+        .replace(/(\d{4})(\d{1,2})$/, '$1-$2');
     }
-    return cleaned;
+    return value;
   };
 
-  // Formatação de telefone
   const formatPhone = (value) => {
-    const cleaned = value.replace(/\D/g, '');
-    const match = cleaned.match(/^(\d{0,2})(\d{0,1})(\d{0,4})(\d{0,4})$/);
-    if (match) {
-      const formatted = [match[1], match[2], match[3], match[4]]
-        .filter(Boolean)
-        .join(' ')
-        .replace(/^(\d{2}) /, '($1) ')
-        .replace(/(\d{1}) (\d{4}) /, '$1 $2-');
-      return formatted;
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 11) {
+      return numbers
+        .replace(/(\d{2})(\d)/, '($1) $2')
+        .replace(/(\d{5})(\d{1,4})$/, '$1-$2');
     }
-    return cleaned;
+    return value;
+  };
+
+  const handleCPFChange = (e) => {
+    const formatted = formatCPF(e.target.value);
+    setFormData(prev => ({ ...prev, cpf: formatted }));
+    if (errors.cpf) setErrors(prev => ({ ...prev, cpf: '' }));
+  };
+
+  const handleCNPJChange = (e) => {
+    const formatted = formatCNPJ(e.target.value);
+    setFormData(prev => ({ ...prev, cnpj: formatted }));
+    if (errors.cnpj) setErrors(prev => ({ ...prev, cnpj: '' }));
+  };
+
+  const handlePhoneChange = (e) => {
+    const formatted = formatPhone(e.target.value);
+    setFormData(prev => ({ ...prev, phone: formatted }));
+    if (errors.phone) setErrors(prev => ({ ...prev, phone: '' }));
   };
 
   const validateForm = () => {
     const newErrors = {};
 
-    // Validações básicas
+    // Validações comuns
     if (!formData.name.trim()) {
       newErrors.name = 'Nome é obrigatório';
     }
@@ -154,11 +152,13 @@ const Register = () => {
       newErrors.password = 'Senha deve ter pelo menos 6 caracteres';
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Senhas não conferem';
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Confirme sua senha';
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'As senhas não coincidem';
     }
 
-    // Validações específicas por tipo de usuário
+    // Validações específicas por tipo
     if (userType === 'professional') {
       if (!formData.cpf.trim()) {
         newErrors.cpf = 'CPF é obrigatório';
@@ -207,6 +207,9 @@ const Register = () => {
       }
     }
 
+    // ✨ Cliente final: apenas validações básicas (nome, email, senha)
+    // Não precisa de validações extras
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -229,10 +232,10 @@ const Register = () => {
         
         // Campos específicos baseado no tipo
         ...(userType === 'professional' && {
-          cpf: formData.cpf.replace(/\D/g, ''), // Remove formatação
-          category_id: formData.categoryId, // ✅ CORRETO: categoryId -> category_id
+          cpf: formData.cpf.replace(/\D/g, ''),
+          category_id: formData.categoryId,
           city: formData.city.trim(),
-          state: formData.state.trim().toUpperCase(), // Garantir maiúscula
+          state: formData.state.trim().toUpperCase(),
           description: formData.description.trim(),
           experience: formData.experience.trim(),
           education: formData.education.trim()
@@ -240,17 +243,19 @@ const Register = () => {
         
         ...(userType === 'company' && {
           companyName: formData.companyName.trim(),
-          cnpj: formData.cnpj.replace(/\D/g, ''), // Remove formatação
+          cnpj: formData.cnpj.replace(/\D/g, ''),
           website: formData.website.trim(),
-          phone: formData.phone.replace(/\D/g, '') // Remove formatação
+          phone: formData.phone.replace(/\D/g, '')
         })
+        
+        // ✨ Cliente não envia campos extras
       };
 
-      console.log('🚀 Dados sendo enviados para registro:', userData); // DEBUG
+      console.log('🚀 Dados sendo enviados para registro:', userData);
 
       const result = await register(userData);
       
-      console.log('📝 Resultado do registro:', result); // DEBUG
+      console.log('📝 Resultado do registro:', result);
       
       if (result.success) {
         console.log('✅ Cadastro realizado com sucesso!');
@@ -285,7 +290,7 @@ const Register = () => {
           </p>
         </div>
 
-        {/* Seletor de tipo de usuário */}
+        {/* ✨ Seletor de tipo de usuário - AGORA COM 3 OPÇÕES */}
         <div className="user-type-selector">
           <button
             type="button"
@@ -293,7 +298,7 @@ const Register = () => {
             onClick={() => setUserType('professional')}
           >
             <User size={20} />
-            <span>Sou Profissional</span>
+            <span>Profissional</span>
           </button>
           <button
             type="button"
@@ -301,7 +306,15 @@ const Register = () => {
             onClick={() => setUserType('company')}
           >
             <Building size={20} />
-            <span>Sou Empresa</span>
+            <span>Empresa</span>
+          </button>
+          <button
+            type="button"
+            className={`type-button ${userType === 'client' ? 'active' : ''}`}
+            onClick={() => setUserType('client')}
+          >
+            <UserCircle size={20} />
+            <span>Cliente Final</span>
           </button>
         </div>
 
@@ -313,10 +326,12 @@ const Register = () => {
             </div>
           )}
 
-          {/* Campos básicos */}
+          {/* Campos básicos - TODOS OS TIPOS */}
           <div className="form-group">
             <label htmlFor="name" className="form-label">
-              {userType === 'professional' ? 'Nome Completo' : 'Nome do Responsável'}
+              {userType === 'professional' ? 'Nome Completo' : 
+               userType === 'company' ? 'Nome do Responsável' : 
+               'Seu Nome'}
             </label>
             <div className="input-wrapper">
               <User className="input-icon" />
@@ -327,41 +342,15 @@ const Register = () => {
                 value={formData.name}
                 onChange={handleChange}
                 className={`form-input ${errors.name ? 'error' : ''}`}
-                placeholder="Seu nome completo"
-                disabled={isSubmitting}
+                placeholder="Digite seu nome completo"
               />
             </div>
-            {errors.name && <span className="error-text">{errors.name}</span>}
+            {errors.name && <span className="error-message">{errors.name}</span>}
           </div>
 
-          {userType === 'company' && (
-            <div className="form-group">
-              <label htmlFor="companyName" className="form-label">
-                Nome da Empresa
-              </label>
-              <div className="input-wrapper">
-                <Building className="input-icon" />
-                <input
-                  type="text"
-                  id="companyName"
-                  name="companyName"
-                  value={formData.companyName}
-                  onChange={handleChange}
-                  className={`form-input ${errors.companyName ? 'error' : ''}`}
-                  placeholder="Nome da sua empresa"
-                  disabled={isSubmitting}
-                />
-              </div>
-              {errors.companyName && <span className="error-text">{errors.companyName}</span>}
-            </div>
-          )}
-
           <div className="form-group">
-            <label htmlFor="email" className="form-label">
-              Email
-            </label>
+            <label htmlFor="email" className="form-label">Email</label>
             <div className="input-wrapper">
-              <Mail className="input-icon" />
               <input
                 type="email"
                 id="email"
@@ -370,320 +359,263 @@ const Register = () => {
                 onChange={handleChange}
                 className={`form-input ${errors.email ? 'error' : ''}`}
                 placeholder="seu@email.com"
-                disabled={isSubmitting}
               />
             </div>
-            {errors.email && <span className="error-text">{errors.email}</span>}
+            {errors.email && <span className="error-message">{errors.email}</span>}
           </div>
 
-          {/* CPF ou CNPJ */}
           <div className="form-group">
-            <label htmlFor={userType === 'professional' ? 'cpf' : 'cnpj'} className="form-label">
-              {userType === 'professional' ? 'CPF' : 'CNPJ'}
-            </label>
+            <label htmlFor="password" className="form-label">Senha</label>
             <div className="input-wrapper">
-              <FileText className="input-icon" />
               <input
-                type="text"
-                id={userType === 'professional' ? 'cpf' : 'cnpj'}
-                name={userType === 'professional' ? 'cpf' : 'cnpj'}
-                value={userType === 'professional' ? formData.cpf : formData.cnpj}
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                name="password"
+                value={formData.password}
                 onChange={handleChange}
-                className={`form-input ${errors.cpf || errors.cnpj ? 'error' : ''}`}
-                placeholder={userType === 'professional' ? '000.000.000-00' : '00.000.000/0000-00'}
-                disabled={isSubmitting}
-                maxLength={userType === 'professional' ? 14 : 18}
+                className={`form-input ${errors.password ? 'error' : ''}`}
+                placeholder="Mínimo 6 caracteres"
               />
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
-            {(errors.cpf || errors.cnpj) && (
-              <span className="error-text">{errors.cpf || errors.cnpj}</span>
-            )}
+            {errors.password && <span className="error-message">{errors.password}</span>}
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="password" className="form-label">
-                Senha
-              </label>
-              <div className="input-wrapper">
-                <Lock className="input-icon" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  id="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className={`form-input ${errors.password ? 'error' : ''}`}
-                  placeholder="Mínimo 6 caracteres"
-                  disabled={isSubmitting}
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={isSubmitting}
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-              {errors.password && <span className="error-text">{errors.password}</span>}
+          <div className="form-group">
+            <label htmlFor="confirmPassword" className="form-label">Confirmar Senha</label>
+            <div className="input-wrapper">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                id="confirmPassword"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className={`form-input ${errors.confirmPassword ? 'error' : ''}`}
+                placeholder="Digite a senha novamente"
+              />
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              >
+                {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
-
-            <div className="form-group">
-              <label htmlFor="confirmPassword" className="form-label">
-                Confirmar Senha
-              </label>
-              <div className="input-wrapper">
-                <Lock className="input-icon" />
-                <input
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className={`form-input ${errors.confirmPassword ? 'error' : ''}`}
-                  placeholder="Digite a senha novamente"
-                  disabled={isSubmitting}
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  disabled={isSubmitting}
-                >
-                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-              {errors.confirmPassword && <span className="error-text">{errors.confirmPassword}</span>}
-            </div>
+            {errors.confirmPassword && <span className="error-message">{errors.confirmPassword}</span>}
           </div>
 
-          {/* Campos específicos para profissional */}
+          {/* ========== CAMPOS ESPECÍFICOS PROFISSIONAL ========== */}
           {userType === 'professional' && (
             <>
               <div className="form-group">
-                <label htmlFor="categoryId" className="form-label">
-                  Categoria Principal
-                </label>
+                <label htmlFor="cpf" className="form-label">CPF</label>
+                <div className="input-wrapper">
+                  <input
+                    type="text"
+                    id="cpf"
+                    name="cpf"
+                    value={formData.cpf}
+                    onChange={handleCPFChange}
+                    className={`form-input ${errors.cpf ? 'error' : ''}`}
+                    placeholder="000.000.000-00"
+                    maxLength="14"
+                  />
+                </div>
+                {errors.cpf && <span className="error-message">{errors.cpf}</span>}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="categoryId" className="form-label">Categoria</label>
                 <select
                   id="categoryId"
                   name="categoryId"
                   value={formData.categoryId}
                   onChange={handleChange}
                   className={`form-input ${errors.categoryId ? 'error' : ''}`}
-                  disabled={isSubmitting}
                 >
-                  <option value="">Selecione sua categoria</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
+                  <option value="">Selecione uma categoria</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
                 </select>
-                {errors.categoryId && <span className="error-text">{errors.categoryId}</span>}
+                {errors.categoryId && <span className="error-message">{errors.categoryId}</span>}
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="city" className="form-label">
-                    Cidade
-                  </label>
-                  <div className="input-wrapper">
-                    <MapPin className="input-icon" />
-                    <input
-                      type="text"
-                      id="city"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                      className={`form-input ${errors.city ? 'error' : ''}`}
-                      placeholder="Sua cidade"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  {errors.city && <span className="error-text">{errors.city}</span>}
+                  <label htmlFor="city" className="form-label">Cidade</label>
+                  <input
+                    type="text"
+                    id="city"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                    className={`form-input ${errors.city ? 'error' : ''}`}
+                    placeholder="Sua cidade"
+                  />
+                  {errors.city && <span className="error-message">{errors.city}</span>}
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="state" className="form-label">
-                    Estado
-                  </label>
-                  <select
+                  <label htmlFor="state" className="form-label">Estado</label>
+                  <input
+                    type="text"
                     id="state"
                     name="state"
                     value={formData.state}
                     onChange={handleChange}
                     className={`form-input ${errors.state ? 'error' : ''}`}
-                    disabled={isSubmitting}
-                  >
-                    <option value="">UF</option>
-                    <option value="AC">AC</option>
-                    <option value="AL">AL</option>
-                    <option value="AP">AP</option>
-                    <option value="AM">AM</option>
-                    <option value="BA">BA</option>
-                    <option value="CE">CE</option>
-                    <option value="DF">DF</option>
-                    <option value="ES">ES</option>
-                    <option value="GO">GO</option>
-                    <option value="MA">MA</option>
-                    <option value="MT">MT</option>
-                    <option value="MS">MS</option>
-                    <option value="MG">MG</option>
-                    <option value="PA">PA</option>
-                    <option value="PB">PB</option>
-                    <option value="PR">PR</option>
-                    <option value="PE">PE</option>
-                    <option value="PI">PI</option>
-                    <option value="RJ">RJ</option>
-                    <option value="RN">RN</option>
-                    <option value="RS">RS</option>
-                    <option value="RO">RO</option>
-                    <option value="RR">RR</option>
-                    <option value="SC">SC</option>
-                    <option value="SP">SP</option>
-                    <option value="SE">SE</option>
-                    <option value="TO">TO</option>
-                  </select>
-                  {errors.state && <span className="error-text">{errors.state}</span>}
+                    placeholder="UF"
+                    maxLength="2"
+                  />
+                  {errors.state && <span className="error-message">{errors.state}</span>}
                 </div>
               </div>
 
               <div className="form-group">
-                <label htmlFor="description" className="form-label">
-                  Descrição dos Serviços
-                </label>
+                <label htmlFor="description" className="form-label">Descrição dos Serviços</label>
                 <textarea
                   id="description"
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  className={`form-textarea ${errors.description ? 'error' : ''}`}
-                  placeholder="Descreva os serviços que você oferece..."
+                  className={`form-input ${errors.description ? 'error' : ''}`}
+                  placeholder="Descreva os serviços que você oferece"
                   rows="3"
-                  disabled={isSubmitting}
                 />
-                {errors.description && <span className="error-text">{errors.description}</span>}
+                {errors.description && <span className="error-message">{errors.description}</span>}
               </div>
 
               <div className="form-group">
-                <label htmlFor="experience" className="form-label">
-                  Experiência Profissional
-                </label>
-                <div className="input-wrapper">
-                  <Briefcase className="input-icon" />
-                  <textarea
-                    id="experience"
-                    name="experience"
-                    value={formData.experience}
-                    onChange={handleChange}
-                    className={`form-textarea ${errors.experience ? 'error' : ''}`}
-                    placeholder="Ex: 10 anos trabalhando em obras residenciais e comerciais"
-                    rows="3"
-                    disabled={isSubmitting}
-                  />
-                </div>
-                {errors.experience && <span className="error-text">{errors.experience}</span>}
+                <label htmlFor="experience" className="form-label">Experiência</label>
+                <textarea
+                  id="experience"
+                  name="experience"
+                  value={formData.experience}
+                  onChange={handleChange}
+                  className={`form-input ${errors.experience ? 'error' : ''}`}
+                  placeholder="Conte sobre sua experiência profissional"
+                  rows="3"
+                />
+                {errors.experience && <span className="error-message">{errors.experience}</span>}
               </div>
 
               <div className="form-group">
-                <label htmlFor="education" className="form-label">
-                  Formação
-                </label>
-                <div className="input-wrapper">
-                  <GraduationCap className="input-icon" />
-                  <textarea
-                    id="education"
-                    name="education"
-                    value={formData.education}
-                    onChange={handleChange}
-                    className={`form-textarea ${errors.education ? 'error' : ''}`}
-                    placeholder="Ex: Curso técnico em construção civil, curso de NR-35"
-                    rows="3"
-                    disabled={isSubmitting}
-                  />
-                </div>
-                {errors.education && <span className="error-text">{errors.education}</span>}
+                <label htmlFor="education" className="form-label">Formação</label>
+                <textarea
+                  id="education"
+                  name="education"
+                  value={formData.education}
+                  onChange={handleChange}
+                  className={`form-input ${errors.education ? 'error' : ''}`}
+                  placeholder="Sua formação e certificações"
+                  rows="3"
+                />
+                {errors.education && <span className="error-message">{errors.education}</span>}
               </div>
             </>
           )}
 
-          {/* Campos específicos para empresa */}
+          {/* ========== CAMPOS ESPECÍFICOS EMPRESA ========== */}
           {userType === 'company' && (
             <>
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="phone" className="form-label">
-                    Telefone da Empresa
-                  </label>
+              <div className="form-group">
+                <label htmlFor="companyName" className="form-label">Nome da Empresa</label>
+                <div className="input-wrapper">
+                  <Building className="input-icon" />
                   <input
                     type="text"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
+                    id="companyName"
+                    name="companyName"
+                    value={formData.companyName}
                     onChange={handleChange}
-                    className={`form-input ${errors.phone ? 'error' : ''}`}
-                    placeholder="(11) 9 9999-9999"
-                    disabled={isSubmitting}
-                    maxLength={16}
+                    className={`form-input ${errors.companyName ? 'error' : ''}`}
+                    placeholder="Nome fantasia ou razão social"
                   />
-                  {errors.phone && <span className="error-text">{errors.phone}</span>}
                 </div>
+                {errors.companyName && <span className="error-message">{errors.companyName}</span>}
+              </div>
 
-                <div className="form-group">
-                  <label htmlFor="website" className="form-label">
-                    Site da Empresa (Opcional)
-                  </label>
-                  <input
-                    type="url"
-                    id="website"
-                    name="website"
-                    value={formData.website}
-                    onChange={handleChange}
-                    className="form-input"
-                    placeholder="https://www.suaempresa.com.br"
-                    disabled={isSubmitting}
-                  />
-                </div>
+              <div className="form-group">
+                <label htmlFor="cnpj" className="form-label">CNPJ</label>
+                <input
+                  type="text"
+                  id="cnpj"
+                  name="cnpj"
+                  value={formData.cnpj}
+                  onChange={handleCNPJChange}
+                  className={`form-input ${errors.cnpj ? 'error' : ''}`}
+                  placeholder="00.000.000/0000-00"
+                  maxLength="18"
+                />
+                {errors.cnpj && <span className="error-message">{errors.cnpj}</span>}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="phone" className="form-label">Telefone</label>
+                <input
+                  type="text"
+                  id="phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handlePhoneChange}
+                  className={`form-input ${errors.phone ? 'error' : ''}`}
+                  placeholder="(00) 00000-0000"
+                  maxLength="15"
+                />
+                {errors.phone && <span className="error-message">{errors.phone}</span>}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="website" className="form-label">Site (opcional)</label>
+                <input
+                  type="text"
+                  id="website"
+                  name="website"
+                  value={formData.website}
+                  onChange={handleChange}
+                  className="form-input"
+                  placeholder="www.suaempresa.com.br"
+                />
               </div>
             </>
           )}
 
-          <button
-            type="submit"
-            className="register-button"
+          {/* ✨ MENSAGEM INFORMATIVA PARA CLIENTE FINAL */}
+          {userType === 'client' && (
+            <div className="info-box">
+              <AlertCircle size={20} />
+              <div>
+                <strong>Conta de Cliente Final</strong>
+                <p>
+                  Como cliente, você poderá visualizar todos os profissionais e empresas, 
+                  acessar informações de contato, mas seu perfil não aparecerá nas buscas.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <button 
+            type="submit" 
+            className="submit-button"
             disabled={isSubmitting}
           >
-            {isSubmitting ? (
-              <div className="loading-spinner" />
-            ) : (
-              <>
-                <UserPlus size={20} />
-                <span>Criar Conta</span>
-              </>
-            )}
+            {isSubmitting ? 'Criando conta...' : 'Criar Conta'}
           </button>
-        </form>
 
-        <div className="register-footer">
-          <p className="login-prompt">
-            Já tem uma conta?{' '}
-            <Link to="/login" className="login-link">
-              Faça login aqui
-            </Link>
+          <p className="login-link">
+            Já tem uma conta? <a href="/login">Faça login</a>
           </p>
-          
-          <div className="divider">
-            <span>ou</span>
-          </div>
-          
-          <Link to="/" className="back-home">
-            Voltar à página inicial
-          </Link>
-        </div>
+        </form>
       </div>
     </div>
   );
-};
+}
 
 export default Register;

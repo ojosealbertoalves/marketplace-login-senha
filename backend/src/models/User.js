@@ -1,4 +1,4 @@
-// backend/src/models/User.js - COM CAMPO DOCUMENTO
+// backend/src/models/User.js - COM TIPO CLIENT
 import { Model } from 'sequelize';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -62,6 +62,13 @@ export default (sequelize, DataTypes) => {
           'indicate_professionals',
           'view_contact_info',
           'create_job_openings'
+        ],
+        // ✨ NOVO: Permissões do cliente final
+        'client': [
+          'view_professionals', // Pode ver profissionais
+          'view_contact_info',  // Pode ver informações de contato
+          'view_own_profile',   // Pode ver seu próprio perfil
+          'edit_own_profile'    // Pode editar seu próprio perfil
         ]
       };
 
@@ -91,11 +98,11 @@ export default (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false
     },
-    // ✅ NOVO CAMPO: Documento (CPF ou CNPJ)
+    // Documento (CPF ou CNPJ)
     documento: {
-      type: DataTypes.STRING(20), // Suporta tanto CPF (11) quanto CNPJ (14) + formatação
-      allowNull: true, // Permitir null para compatibilidade com dados existentes
-      unique: true, // Não pode ter documento duplicado
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      unique: true,
       validate: {
         isValidDocument(value) {
           if (value) {
@@ -107,11 +114,11 @@ export default (sequelize, DataTypes) => {
         }
       }
     },
-    // Tipo de usuário
+    // ✨ Tipo de usuário - AGORA COM CLIENT
     user_type: {
-      type: DataTypes.ENUM('admin', 'professional', 'company'),
+      type: DataTypes.ENUM('admin', 'professional', 'company', 'client'),
       allowNull: false,
-      defaultValue: 'professional'
+      defaultValue: 'client' // Cliente como padrão
     },
     phone: {
       type: DataTypes.STRING,
