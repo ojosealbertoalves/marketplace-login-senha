@@ -1,4 +1,4 @@
-// backend/src/controllers/professionalController.js - VERSÃO COMPLETA
+// backend/src/controllers/professionalController.js - VERSÃO TEMPORÁRIA SEM FILTRO
 import db from '../models/index.js';
 
 // 📋 Listar todos os profissionais (público, mas com controle de acesso)
@@ -7,7 +7,6 @@ export const getAllProfessionals = async (req, res) => {
     const { category, city, state, search, page = 1, limit = 20 } = req.query;
     const isAuthenticated = !!req.user;
 
-    // ✨ Apenas profissionais ativos - EXCLUIR CLIENTES
     const where = { is_active: true };
     
     const include = [
@@ -32,17 +31,6 @@ export const getAllProfessionals = async (req, res) => {
         as: 'portfolio',
         required: false,
         limit: 3
-      },
-      // ✨ INCLUIR USER PARA VERIFICAR SE NÃO É CLIENTE
-      {
-        model: db.User,
-        as: 'user',
-        required: true,
-        attributes: ['id', 'user_type', 'is_active'],
-        where: {
-          user_type: { [db.Sequelize.Op.ne]: 'client' },
-          is_active: true
-        }
       }
     ];
 
@@ -89,9 +77,6 @@ export const getAllProfessionals = async (req, res) => {
         delete professional.google_maps_link;
         professional.contactRestricted = true;
       }
-
-      // Remover dados do user
-      delete professional.user;
 
       return {
         id: professional.id,
@@ -159,16 +144,6 @@ export const getProfessionalById = async (req, res) => {
         {
           model: db.PortfolioItem,
           as: 'portfolio'
-        },
-        // ✨ VERIFICAR SE NÃO É CLIENTE
-        {
-          model: db.User,
-          as: 'user',
-          attributes: ['id', 'user_type'],
-          required: true,
-          where: {
-            user_type: { [db.Sequelize.Op.ne]: 'client' }
-          }
         }
       ]
     });
@@ -191,9 +166,6 @@ export const getProfessionalById = async (req, res) => {
       profData.contactRestricted = true;
     }
 
-    // Remover dados do user
-    delete profData.user;
-
     res.json({
       success: true,
       data: profData
@@ -215,26 +187,11 @@ export const updateProfessional = async (req, res) => {
     const userId = req.user.id;
     const userType = req.user.user_type;
 
-    const professional = await db.Professional.findByPk(id, {
-      include: [
-        {
-          model: db.User,
-          as: 'user',
-          required: true
-        }
-      ]
-    });
+    const professional = await db.Professional.findByPk(id);
 
     if (!professional) {
       return res.status(404).json({
         error: 'Profissional não encontrado'
-      });
-    }
-
-    // ✨ Clientes não podem ter perfil profissional
-    if (professional.user.user_type === 'client') {
-      return res.status(403).json({
-        error: 'Este perfil não pode ser editado'
       });
     }
 
@@ -311,8 +268,6 @@ export const indicateProfessional = async (req, res) => {
       });
     }
 
-    // Aqui você pode implementar a lógica de indicação
-    // Por enquanto, vamos apenas retornar sucesso
     res.json({
       success: true,
       message: 'Indicação registrada com sucesso'
@@ -339,7 +294,6 @@ export const getProfessionalStats = async (req, res) => {
       });
     }
 
-    // Retornar estatísticas básicas
     res.json({
       success: true,
       data: {

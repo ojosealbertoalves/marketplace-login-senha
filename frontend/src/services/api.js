@@ -1,4 +1,4 @@
-// frontend/src/services/api.js - CORRIGIDO
+// frontend/src/services/api.js - COMPLETO COM AMBOS EXPORTS
 const API_BASE_URL = 'http://localhost:3001/api';
 
 // ===== AUTENTICAÇÃO =====
@@ -154,8 +154,8 @@ export const getStates = async () => {
   }
 };
 
-// Export default para compatibilidade
-export default {
+// ===== EXPORT COMO OBJETO (para compatibilidade com código existente) =====
+export const apiService = {
   register,
   login,
   checkEmail,
@@ -166,3 +166,6 @@ export default {
   getCities,
   getStates
 };
+
+// Export default para compatibilidade
+export default apiService;
