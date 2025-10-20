@@ -1,4 +1,4 @@
-// backend/src/controllers/authController.js - COM CAMPO DOCUMENTO
+// backend/src/controllers/authController.js - COMPLETO
 import db from '../models/index.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -149,7 +149,7 @@ export const register = async (req, res) => {
         });
       }
 
-      documento = cpf.replace(/\D/g, ''); // Salvar apenas números
+      documento = cpf.replace(/\D/g, '');
 
       if (!category_id) {
         return res.status(400).json({
@@ -189,13 +189,18 @@ export const register = async (req, res) => {
         });
       }
 
-      documento = cnpj.replace(/\D/g, ''); // Salvar apenas números
+      documento = cnpj.replace(/\D/g, '');
 
       if (!phone) {
         return res.status(400).json({
           error: 'Telefone é obrigatório para empresas'
         });
       }
+    }
+
+    // ✨ Cliente final não precisa de validações extras
+    if (userType === 'client') {
+      console.log('👤 Registrando cliente final');
     }
 
     // ✅ VERIFICAR SE EMAIL OU DOCUMENTO JÁ EXISTEM
@@ -221,12 +226,12 @@ export const register = async (req, res) => {
       }
     }
 
-    // ✅ CRIAR USUÁRIO COM DOCUMENTO
+    // ✅ CRIAR USUÁRIO
     const user = await db.User.create({
       name,
       email,
-      password, // Será hasheado pelo hook
-      documento, // ← NOVO: Salvar CPF/CNPJ aqui
+      password,
+      documento,
       user_type: userType,
       phone: userType === 'company' ? phone : null,
       city,
@@ -256,7 +261,6 @@ export const register = async (req, res) => {
 
       console.log('✅ Profissional criado:', professional.id);
 
-      // Associar subcategorias se fornecidas
       if (subcategories && subcategories.length > 0) {
         const subcategoryObjects = await db.Subcategory.findAll({
           where: { id: subcategories }
@@ -272,7 +276,7 @@ export const register = async (req, res) => {
       await db.Company.create({
         user_id: user.id,
         company_name: companyName,
-        cnpj: documento, // Usar o documento validado
+        cnpj: documento,
         website,
         email,
         phone,
@@ -284,6 +288,10 @@ export const register = async (req, res) => {
       console.log('✅ Empresa criada');
     }
 
+    if (userType === 'client') {
+      console.log('👤 Cliente final criado - sem perfil adicional');
+    }
+
     // Gerar token
     const token = user.generateToken();
 
@@ -291,7 +299,7 @@ export const register = async (req, res) => {
     const userData = user.toJSON();
     delete userData.password;
     delete userData.email_verification_token;
-    delete userData.documento; // Não retornar documento por segurança
+    delete userData.documento;
 
     console.log('🎉 Registro completado com sucesso!');
 
@@ -304,7 +312,6 @@ export const register = async (req, res) => {
   } catch (error) {
     console.error('❌ Erro ao registrar usuário:', error);
     
-    // Tratar erro de unicidade do Sequelize
     if (error.name === 'SequelizeUniqueConstraintError') {
       const field = error.errors[0]?.path;
       if (field === 'email') {
@@ -337,7 +344,6 @@ export const login = async (req, res) => {
       });
     }
 
-    // Buscar usuário com senha
     const user = await db.User.findOne({ 
       where: { email },
       include: [
@@ -367,7 +373,6 @@ export const login = async (req, res) => {
       });
     }
 
-    // Verificar senha
     const isValidPassword = await user.validatePassword(password);
     if (!isValidPassword) {
       return res.status(401).json({
@@ -375,16 +380,14 @@ export const login = async (req, res) => {
       });
     }
 
-    // Gerar token
     const token = user.generateToken();
 
-    // Preparar dados do usuário (sem senha e documento)
     const userData = user.toJSON();
     delete userData.password;
     delete userData.email_verification_token;
     delete userData.reset_password_token;
     delete userData.reset_password_expires;
-    delete userData.documento; // Não retornar documento por segurança
+    delete userData.documento;
 
     res.json({
       message: 'Login realizado com sucesso',
@@ -444,15 +447,13 @@ export const updateProfile = async (req, res) => {
     const userId = req.user.id;
     const updates = req.body;
 
-    // Campos que não podem ser atualizados diretamente
     delete updates.id;
     delete updates.user_type;
     delete updates.email_verified;
     delete updates.created_at;
     delete updates.updated_at;
-    delete updates.documento; // Documento não pode ser alterado pelo perfil
+    delete updates.documento;
 
-    // Se está tentando atualizar senha, verificar senha atual
     if (updates.password) {
       if (!updates.currentPassword) {
         return res.status(400).json({
@@ -472,12 +473,10 @@ export const updateProfile = async (req, res) => {
       delete updates.currentPassword;
     }
 
-    // Atualizar usuário
     await db.User.update(updates, {
       where: { id: userId }
     });
 
-    // Buscar dados atualizados
     const updatedUser = await db.User.findByPk(userId, {
       attributes: { exclude: ['password', 'email_verification_token', 'documento'] }
     });
@@ -495,7 +494,7 @@ export const updateProfile = async (req, res) => {
   }
 };
 
-// 🚪 Logout (invalidar token - implementação simples)
+// 🚪 Logout
 export const logout = async (req, res) => {
   try {
     res.json({
@@ -525,6 +524,167 @@ export const verifyToken = async (req, res) => {
     res.status(401).json({
       valid: false,
       error: 'Token inválido'
+    });
+  }
+};
+
+// ========================================
+// 🔑 FUNÇÕES DE RECUPERAÇÃO DE SENHA
+// ========================================
+
+// 🔑 Gerar código de recuperação de senha
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        error: 'Email é obrigatório'
+      });
+    }
+
+    const user = await db.User.findOne({ where: { email } });
+
+    if (!user) {
+      // Por segurança, não revela se o email existe
+      return res.json({
+        success: true,
+        message: 'Se o email existir, você receberá o código de recuperação'
+      });
+    }
+
+    // Gerar código de 6 dígitos
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Salvar código e data de expiração (15 minutos)
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
+    await user.update({
+      reset_password_token: resetCode,
+      reset_password_expires: expiresAt
+    });
+
+    console.log(`🔑 Código de recuperação gerado para ${email}: ${resetCode}`);
+
+    res.json({
+      success: true,
+      message: 'Código de recuperação gerado',
+      // ⚠️ APENAS PARA DESENVOLVIMENTO - REMOVER EM PRODUÇÃO
+      resetCode: resetCode,
+      email: email
+    });
+
+  } catch (error) {
+    console.error('Erro ao gerar código de recuperação:', error);
+    res.status(500).json({
+      error: 'Erro ao processar solicitação',
+      details: error.message
+    });
+  }
+};
+
+// ✅ Verificar código de recuperação
+export const verifyResetCode = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({
+        error: 'Email e código são obrigatórios'
+      });
+    }
+
+    const user = await db.User.findOne({ where: { email } });
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'Usuário não encontrado'
+      });
+    }
+
+    if (user.reset_password_token !== code) {
+      return res.status(400).json({
+        error: 'Código inválido'
+      });
+    }
+
+    if (new Date() > new Date(user.reset_password_expires)) {
+      return res.status(400).json({
+        error: 'Código expirado. Solicite um novo código.'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Código válido'
+    });
+
+  } catch (error) {
+    console.error('Erro ao verificar código:', error);
+    res.status(500).json({
+      error: 'Erro ao verificar código',
+      details: error.message
+    });
+  }
+};
+
+// 🔄 Resetar senha com código
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({
+        error: 'Email, código e nova senha são obrigatórios'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        error: 'A senha deve ter pelo menos 6 caracteres'
+      });
+    }
+
+    const user = await db.User.findOne({ where: { email } });
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'Usuário não encontrado'
+      });
+    }
+
+    if (user.reset_password_token !== code) {
+      return res.status(400).json({
+        error: 'Código inválido'
+      });
+    }
+
+    if (new Date() > new Date(user.reset_password_expires)) {
+      return res.status(400).json({
+        error: 'Código expirado. Solicite um novo código.'
+      });
+    }
+
+    // Atualizar senha e limpar tokens
+    await user.update({
+      password: newPassword, // Será hasheado pelo hook
+      reset_password_token: null,
+      reset_password_expires: null
+    });
+
+    console.log(`✅ Senha resetada com sucesso para: ${email}`);
+
+    res.json({
+      success: true,
+      message: 'Senha alterada com sucesso'
+    });
+
+  } catch (error) {
+    console.error('Erro ao resetar senha:', error);
+    res.status(500).json({
+      error: 'Erro ao resetar senha',
+      details: error.message
     });
   }
 };

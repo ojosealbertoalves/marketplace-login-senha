@@ -433,4 +433,27 @@
   .user-type-selector {
     grid-template-columns: 1fr;
   }
+
+  /* Adicione no final do Login.css */
+
+/* Linha com label e link esqueci senha */
+.password-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.forgot-password-link {
+  color: #3b82f6;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.forgot-password-link:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
 }

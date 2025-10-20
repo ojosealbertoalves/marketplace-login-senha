@@ -1,4 +1,4 @@
-// frontend/src/pages/Login.jsx
+// frontend/src/pages/Login.jsx - CORRIGIDO
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, LogIn, AlertCircle } from 'lucide-react';
@@ -70,7 +70,8 @@ const Login = () => {
     setErrors({});
 
     try {
-      const result = await login(formData.email, formData.password);
+      // ✅ CORRIGIDO: Passar formData como objeto
+      const result = await login(formData);
       
       if (result.success) {
         // Redirecionar para onde estava tentando acessar ou página inicial
@@ -137,9 +138,15 @@ const Login = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="password" className="form-label">
-              Senha
-            </label>
+            <div className="password-label-row">
+              <label htmlFor="password" className="form-label">
+                Senha
+              </label>
+              {/* ✨ LINK ESQUECI MINHA SENHA */}
+              <Link to="/esqueci-senha" className="forgot-password-link">
+                Esqueci minha senha
+              </Link>
+            </div>
             <div className="input-wrapper">
               <Lock className="input-icon" />
               <input

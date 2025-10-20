@@ -1,7 +1,7 @@
-// backend/src/controllers/professionalController.js - VERSÃO TEMPORÁRIA SEM FILTRO
+// backend/src/controllers/professionalController.js - COM FILTRO DE CLIENTE
 import db from '../models/index.js';
 
-// 📋 Listar todos os profissionais (público, mas com controle de acesso)
+// 📋 Listar todos os profissionais (FILTRANDO CLIENTES)
 export const getAllProfessionals = async (req, res) => {
   try {
     const { category, city, state, search, page = 1, limit = 20 } = req.query;
@@ -31,6 +31,13 @@ export const getAllProfessionals = async (req, res) => {
         as: 'portfolio',
         required: false,
         limit: 3
+      },
+      // ✨ INCLUIR USER PARA VERIFICAR TIPO
+      {
+        model: db.User,
+        as: 'user',
+        required: false, // Não obrigatório para não quebrar profissionais sem user_id
+        attributes: ['id', 'user_type', 'is_active']
       }
     ];
 
@@ -64,8 +71,17 @@ export const getAllProfessionals = async (req, res) => {
       order: [['created_at', 'DESC']]
     });
 
+    // ✨ FILTRAR CLIENTES NA MEMÓRIA (após buscar do banco)
+    const filteredProfessionals = professionals.filter(prof => {
+      // Se não tem user associado, mostrar (profissionais antigos)
+      if (!prof.user) return true;
+      
+      // Se tem user, só mostrar se NÃO for cliente
+      return prof.user.user_type !== 'client';
+    });
+
     // Formatar dados com controle de acesso
-    const formattedProfessionals = professionals.map(prof => {
+    const formattedProfessionals = filteredProfessionals.map(prof => {
       const professional = prof.toJSON();
       
       // Se não está autenticado, ocultar informações de contato
@@ -77,6 +93,9 @@ export const getAllProfessionals = async (req, res) => {
         delete professional.google_maps_link;
         professional.contactRestricted = true;
       }
+
+      // Remover dados do user da resposta
+      delete professional.user;
 
       return {
         id: professional.id,
@@ -104,10 +123,10 @@ export const getAllProfessionals = async (req, res) => {
       success: true,
       data: formattedProfessionals,
       pagination: {
-        total: count,
+        total: filteredProfessionals.length, // Usar total filtrado
         page: parseInt(page),
         limit: parseInt(limit),
-        pages: Math.ceil(count / limit)
+        pages: Math.ceil(filteredProfessionals.length / limit)
       }
     });
 
@@ -144,11 +163,25 @@ export const getProfessionalById = async (req, res) => {
         {
           model: db.PortfolioItem,
           as: 'portfolio'
+        },
+        // ✨ INCLUIR USER PARA VERIFICAR TIPO
+        {
+          model: db.User,
+          as: 'user',
+          required: false,
+          attributes: ['id', 'user_type']
         }
       ]
     });
 
     if (!professional) {
+      return res.status(404).json({
+        error: 'Profissional não encontrado'
+      });
+    }
+
+    // ✨ SE FOR CLIENTE, RETORNAR 404
+    if (professional.user && professional.user.user_type === 'client') {
       return res.status(404).json({
         error: 'Profissional não encontrado'
       });
@@ -165,6 +198,9 @@ export const getProfessionalById = async (req, res) => {
       delete profData.google_maps_link;
       profData.contactRestricted = true;
     }
+
+    // Remover dados do user
+    delete profData.user;
 
     res.json({
       success: true,
@@ -187,11 +223,26 @@ export const updateProfessional = async (req, res) => {
     const userId = req.user.id;
     const userType = req.user.user_type;
 
-    const professional = await db.Professional.findByPk(id);
+    const professional = await db.Professional.findByPk(id, {
+      include: [
+        {
+          model: db.User,
+          as: 'user',
+          required: false
+        }
+      ]
+    });
 
     if (!professional) {
       return res.status(404).json({
         error: 'Profissional não encontrado'
+      });
+    }
+
+    // ✨ Clientes não podem editar perfil profissional
+    if (professional.user && professional.user.user_type === 'client') {
+      return res.status(403).json({
+        error: 'Este perfil não pode ser editado'
       });
     }
 

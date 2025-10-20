@@ -1,4 +1,4 @@
-// frontend/src/services/api.js - COMPLETO COM AMBOS EXPORTS
+// frontend/src/services/api.js - CORRIGIDO COM CATEGORIAS
 const API_BASE_URL = 'http://localhost:3001/api';
 
 // ===== AUTENTICAÇÃO =====
@@ -81,10 +81,11 @@ export const getProfessionals = async () => {
     const response = await fetch(`${API_BASE_URL}/professionals`, { headers });
     const data = await response.json();
     
+    // A API retorna { success: true, data: [...] }
     return data.data || [];
   } catch (error) {
     console.error('Erro ao buscar profissionais:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -111,11 +112,23 @@ export const getProfessionalById = async (id) => {
 export const getCategories = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/categories`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     const data = await response.json();
+    
+    // A API retorna um array direto, não { data: [...] }
+    // Verificar se é array ou objeto com data
+    if (Array.isArray(data)) {
+      return data;
+    }
+    
     return data.data || [];
   } catch (error) {
     console.error('Erro ao buscar categorias:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -126,7 +139,7 @@ export const getSubcategories = async (categoryId) => {
     return data.data || [];
   } catch (error) {
     console.error('Erro ao buscar subcategorias:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -139,7 +152,7 @@ export const getCities = async () => {
     return data.data || [];
   } catch (error) {
     console.error('Erro ao buscar cidades:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -150,7 +163,7 @@ export const getStates = async () => {
     return data.data || [];
   } catch (error) {
     console.error('Erro ao buscar estados:', error);
-    throw error;
+    return [];
   }
 };
 
