@@ -1,4 +1,4 @@
-// frontend/src/App.jsx - VERSÃO FINAL COM REGISTRO
+// frontend/src/App.jsx - COM PERFIL DE USUÁRIO
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
@@ -9,6 +9,7 @@ import HowItWorks from './pages/HowItWorks';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
+import Profile from './pages/Profile';
 import './App.css';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Register />} />
           <Route path="/esqueci-senha" element={<ForgotPassword />} />
+          <Route path="/perfil" element={<Profile />} />
         </Routes>
       </main>
     </div>
@@ -32,4 +34,3 @@ function App() {
 }
 
 export default App;
-

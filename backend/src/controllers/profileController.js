@@ -1,4 +1,4 @@
-// backend/src/controllers/profileController.js - CRUD do perfil
+// backend/src/controllers/profileController.js - COM SUBCATEGORIAS E IMAGENS
 import db from '../models/index.js';
 
 // Buscar perfil completo do usuário logado
@@ -6,7 +6,6 @@ export const getMyProfile = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Buscar usuário com perfil profissional
     const user = await db.User.findByPk(userId, {
       attributes: { exclude: ['password', 'email_verification_token', 'documento'] },
       include: [
@@ -55,14 +54,12 @@ export const updateBasicInfo = async (req, res) => {
     const userId = req.user.id;
     const { name, email, phone, city, state } = req.body;
 
-    // Validações básicas
     if (!name || !email) {
       return res.status(400).json({
         error: 'Nome e email são obrigatórios'
       });
     }
 
-    // Atualizar dados básicos na tabela users
     await db.User.update(
       { name, email, phone, city, state },
       { where: { id: userId } }
@@ -94,10 +91,10 @@ export const updateProfessionalInfo = async (req, res) => {
       experience,
       education,
       whatsapp,
-      business_address
+      business_address,
+      subcategories // ✅ NOVO: suporte a subcategorias
     } = req.body;
 
-    // Buscar perfil profissional do usuário
     const professional = await db.Professional.findOne({
       where: { user_id: userId }
     });
@@ -117,6 +114,15 @@ export const updateProfessionalInfo = async (req, res) => {
       whatsapp,
       business_address
     });
+
+    // ✅ Atualizar subcategorias se fornecidas
+    if (subcategories && Array.isArray(subcategories)) {
+      const subcategoryObjects = await db.Subcategory.findAll({
+        where: { id: subcategories }
+      });
+      await professional.setSubcategories(subcategoryObjects);
+      console.log(`✅ Subcategorias atualizadas: ${subcategories.length} itens`);
+    }
 
     console.log(`✅ Dados profissionais atualizados para: ${professional.id}`);
 
@@ -139,7 +145,6 @@ export const getMyPortfolio = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Buscar profissional
     const professional = await db.Professional.findOne({
       where: { user_id: userId }
     });
@@ -150,7 +155,6 @@ export const getMyPortfolio = async (req, res) => {
       });
     }
 
-    // Buscar itens do portfólio
     const portfolioItems = await db.PortfolioItem.findAll({
       where: { professional_id: professional.id },
       order: [['created_at', 'DESC']]
@@ -184,7 +188,6 @@ export const addPortfolioItem = async (req, res) => {
       });
     }
 
-    // Buscar profissional
     const professional = await db.Professional.findOne({
       where: { user_id: userId }
     });
@@ -195,7 +198,16 @@ export const addPortfolioItem = async (req, res) => {
       });
     }
 
-    // Criar item do portfólio
+    // ✅ Parse images se vier como string
+    let imagesList = images;
+    if (typeof images === 'string') {
+      try {
+        imagesList = JSON.parse(images);
+      } catch (e) {
+        imagesList = [images];
+      }
+    }
+
     const portfolioItem = await db.PortfolioItem.create({
       id: `portfolio-${Date.now()}`,
       professional_id: professional.id,
@@ -204,7 +216,7 @@ export const addPortfolioItem = async (req, res) => {
       project_type,
       area,
       duration,
-      images: images || [],
+      images: imagesList || [],
       completed_at: new Date()
     });
 
@@ -232,7 +244,6 @@ export const updatePortfolioItem = async (req, res) => {
     const { itemId } = req.params;
     const { title, description, project_type, area, duration, images } = req.body;
 
-    // Buscar profissional
     const professional = await db.Professional.findOne({
       where: { user_id: userId }
     });
@@ -243,7 +254,6 @@ export const updatePortfolioItem = async (req, res) => {
       });
     }
 
-    // Buscar item do portfólio
     const portfolioItem = await db.PortfolioItem.findOne({
       where: { 
         id: itemId,
@@ -257,7 +267,6 @@ export const updatePortfolioItem = async (req, res) => {
       });
     }
 
-    // Atualizar item
     await portfolioItem.update({
       title,
       description,
@@ -290,7 +299,6 @@ export const deletePortfolioItem = async (req, res) => {
     const userId = req.user.id;
     const { itemId } = req.params;
 
-    // Buscar profissional
     const professional = await db.Professional.findOne({
       where: { user_id: userId }
     });
@@ -301,7 +309,6 @@ export const deletePortfolioItem = async (req, res) => {
       });
     }
 
-    // Buscar e remover item
     const portfolioItem = await db.PortfolioItem.findOne({
       where: { 
         id: itemId,

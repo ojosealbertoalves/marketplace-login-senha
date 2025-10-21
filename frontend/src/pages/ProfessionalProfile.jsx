@@ -1,3 +1,4 @@
+// frontend/src/pages/ProfessionalProfile.jsx - VERSÃO ORIGINAL COMPLETA
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -98,17 +99,30 @@ const ProfessionalProfile = () => {
   const handleWhatsAppClick = () => {
     if (!isAuthenticated) {
       alert('Faça login para entrar em contato com este profissional');
+      localStorage.setItem('redirectAfterLogin', window.location.pathname);
+      navigate('/login');
       return;
     }
 
-    const message = `Olá ${professional.name}! Vi seu perfil no Marketplace da Construção Civil e gostaria de solicitar um orçamento.`;
-    const whatsappUrl = `https://wa.me/55${professional.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+    const message = `Olá ${professional.name}! Vi seu perfil no Catálogo Construção e gostaria de conversar sobre seus serviços.`;
+    const phoneNumber = (professional.whatsapp || professional.phone)?.replace(/\D/g, '');
+    if (phoneNumber) {
+      const whatsappUrl = `https://wa.me/55${phoneNumber}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+    }
   };
 
-  const handleLoginRedirect = () => {
-    localStorage.setItem('redirectAfterLogin', window.location.pathname);
-    navigate('/login');
+  const handlePhoneClick = () => {
+    if (!isAuthenticated) {
+      alert('Faça login para ver informações de contato');
+      localStorage.setItem('redirectAfterLogin', window.location.pathname);
+      navigate('/login');
+      return;
+    }
+    const phoneNumber = professional.whatsapp || professional.phone;
+    if (phoneNumber) {
+      window.location.href = `tel:${phoneNumber}`;
+    }
   };
 
   const openProjectModal = (project) => {
@@ -116,7 +130,7 @@ const ProfessionalProfile = () => {
     setCurrentImageIndex(0);
   };
 
-  const closeModal = () => {
+  const closeProjectModal = () => {
     setSelectedProject(null);
     setCurrentImageIndex(0);
   };
@@ -124,12 +138,12 @@ const ProfessionalProfile = () => {
   const nextImage = () => {
     if (selectedProject && selectedProject.images) {
       setCurrentImageIndex((prev) => 
-        (prev + 1) % selectedProject.images.length
+        prev === selectedProject.images.length - 1 ? 0 : prev + 1
       );
     }
   };
 
-  const prevImage = () => {
+  const previousImage = () => {
     if (selectedProject && selectedProject.images) {
       setCurrentImageIndex((prev) => 
         prev === 0 ? selectedProject.images.length - 1 : prev - 1
@@ -139,49 +153,37 @@ const ProfessionalProfile = () => {
 
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="loading-content">
-          <div className="loading-spinner"></div>
-          <p className="loading-text">Carregando perfil do profissional...</p>
-        </div>
+      <div className="profile-loading">
+        <div className="loading-spinner"></div>
+        <p>Carregando perfil...</p>
       </div>
     );
   }
 
   if (error || !professional) {
     return (
-      <div className="error-container">
-        <div className="error-content">
-          <h2 className="error-title">Profissional não encontrado</h2>
-          <p className="error-message">
-            O profissional que você está procurando não existe ou foi removido.
-          </p>
-          <button
-            onClick={() => navigate('/')}
-            className="btn-primary"
-          >
-            Voltar à página inicial
-          </button>
-        </div>
+      <div className="profile-error">
+        <p>{error || 'Profissional não encontrado'}</p>
+        <button onClick={() => navigate('/')} className="back-home-btn">
+          Voltar para Home
+        </button>
       </div>
     );
   }
 
-  // Verificar se tem acesso às informações de contato
-  const hasContactAccess = isAuthenticated && !professional.contactRestricted;
+  // Formatar categoria para exibição
+  const categoryName = typeof professional.category === 'object' 
+    ? professional.category.name 
+    : professional.category;
 
-  // Extrair nome da categoria de forma segura
-  const categoryName = professional.category?.name || professional.category || 'Não especificada';
-
-  // Extrair nome da cidade de forma segura
-  const cityName = professional.cityRelation?.name || professional.city || 'Não informada';
-
-  // Extrair subcategorias de forma segura
-  const subcategoryNames = Array.isArray(professional.subcategories) && professional.subcategories.length > 0
+  // Formatar subcategorias para exibição
+  const formattedSubcategories = professional.subcategories && professional.subcategories.length > 0
     ? professional.subcategories.map(sub => 
         typeof sub === 'object' ? sub.name : sub
       ).join(', ')
-    : professional.subcategory || 'Não especificada';
+    : (typeof professional.subcategory === 'object' 
+        ? professional.subcategory.name 
+        : professional.subcategory || 'Não especificada');
 
   return (
     <div className="profile-container">
@@ -224,43 +226,49 @@ const ProfessionalProfile = () => {
                     <span className="category-icon">
                       {getCategoryIcon(categoryName)}
                     </span>
-                    <div>
-                      <p className="subcategory">{subcategoryNames}</p>
-                      <p className="category">{categoryName}</p>
-                    </div>
+                    <span>{categoryName}</span>
                   </div>
                   
-                  <div className="profile-meta">
-                    <div className="meta-item">
-                      <MapPin size={16} />
-                      <span>{cityName}, {professional.state || 'N/A'}</span>
-                    </div>
-                    <div className="meta-item">
-                      <Calendar size={16} />
-                      <span>Cadastrado desde {formatDate(professional.created_at || professional.registrationDate)}</span>
-                    </div>
+                  <div className="profile-location">
+                    <MapPin size={16} />
+                    <span>{professional.city}, {professional.state}</span>
                   </div>
-
-                  {/* Tags */}
-                  {professional.tags && professional.tags.length > 0 && (
-                    <div className="profile-tags">
-                      {professional.tags.map((tag, index) => (
-                        <span key={index} className="tag-badge">
-                          {tag}
-                        </span>
-                      ))}
+                  
+                  {professional.memberSince && (
+                    <div className="member-since">
+                      <Calendar size={16} />
+                      <span>Membro desde {formatDate(professional.memberSince)}</span>
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* Subcategorias */}
+              {formattedSubcategories !== 'Não especificada' && (
+                <div className="subcategories-section">
+                  <div className="section-header">
+                    <Tag size={18} />
+                    <h3>Especialidades</h3>
+                  </div>
+                  <p className="subcategories-text">{formattedSubcategories}</p>
+                </div>
+              )}
+
+              {/* Descrição */}
+              {professional.description && (
+                <div className="description-section">
+                  <h3>Sobre</h3>
+                  <p>{professional.description}</p>
+                </div>
+              )}
             </div>
 
             {/* Indicação */}
             {professional.indicationsReceived && professional.indicationsReceived.length > 0 && (
               <div className="indication-card">
-                <div className="indication-header">
+                <div className="indication-badge">
                   <Award size={20} />
-                  <h3>Profissional Indicado</h3>
+                  <span>Profissional Indicado</span>
                 </div>
                 <p className="indication-text">
                   Indicado por <strong>{professional.indicationsReceived[0].fromProfessional?.name || professional.referredBy || 'Outro profissional'}</strong>
@@ -314,50 +322,24 @@ const ProfessionalProfile = () => {
                     >
                       <div className="project-image-container">
                         <img
-                          src={project.images && project.images[0] ? project.images[0] : 'https://placehold.co/400x300/e2e8f0/64748b?text=Sem+Imagem'}
+                          src={project.images && project.images[0] ? 
+                            project.images[0] : 
+                            'https://via.placeholder.com/400x300?text=Sem+Imagem'
+                          }
                           alt={project.title}
                           className="project-image"
-                          onError={(e) => {
-                            e.target.src = 'https://placehold.co/400x300/e2e8f0/64748b?text=Sem+Imagem';
-                          }}
                         />
                         {project.images && project.images.length > 1 && (
-                          <div className="image-count">
+                          <div className="image-count-badge">
                             <Image size={14} />
-                            <span>{project.images.length}</span>
+                            {project.images.length}
                           </div>
                         )}
                       </div>
-                      
-                      <div className="project-content">
+                      <div className="project-info">
                         <h4 className="project-title">{project.title}</h4>
-                        <p className="project-description">{project.description}</p>
-                        
-                        <div className="project-details">
-                          {project.area && (
-                            <div className="detail-item">
-                              <Ruler size={14} />
-                              <span>{project.area}</span>
-                            </div>
-                          )}
-                          {project.duration && (
-                            <div className="detail-item">
-                              <Clock size={14} />
-                              <span>{project.duration}</span>
-                            </div>
-                          )}
-                          {project.completed_at && (
-                            <div className="detail-item">
-                              <Calendar size={14} />
-                              <span>{formatProjectDate(project.completed_at)}</span>
-                            </div>
-                          )}
-                        </div>
-                        
                         {project.project_type && (
-                          <div className="project-type">
-                            {project.project_type}
-                          </div>
+                          <span className="project-type">{project.project_type}</span>
                         )}
                       </div>
                     </div>
@@ -367,75 +349,38 @@ const ProfessionalProfile = () => {
             )}
           </div>
 
-          {/* Sidebar */}
+          {/* Sidebar com contato */}
           <aside className="sidebar">
-            {/* Botão WhatsApp ou Prompt de Login */}
-            <div className="whatsapp-card">
-              {hasContactAccess ? (
+            <div className="contact-card">
+              <h3 className="contact-title">Informações de Contato</h3>
+              
+              {isAuthenticated ? (
                 <>
-                  {professional.whatsapp ? (
-                    <>
-                      <button
-                        onClick={handleWhatsAppClick}
-                        className="whatsapp-button"
-                      >
-                        <Phone size={20} />
-                        <span>Solicitar Orçamento</span>
-                      </button>
-                      <p className="whatsapp-text">
-                        Conversa direta via WhatsApp
-                      </p>
-                    </>
-                  ) : (
-                    <div className="login-prompt">
-                      <Phone size={24} />
-                      <h3>Sem Contato</h3>
-                      <p>Este profissional ainda não cadastrou informações de contato</p>
-                    </div>
+                  {/* Botão WhatsApp */}
+                  {(professional.whatsapp || professional.phone) && (
+                    <button 
+                      className="contact-button whatsapp"
+                      onClick={handleWhatsAppClick}
+                    >
+                      <Phone size={20} />
+                      <span>Chamar no WhatsApp</span>
+                    </button>
                   )}
-                </>
-              ) : (
-                <div className="login-prompt">
-                  <Lock size={24} />
-                  <h3>Contato Restrito</h3>
-                  <p>Faça login para ver as informações de contato e solicitar orçamentos</p>
-                  <button
-                    onClick={handleLoginRedirect}
-                    className="login-button"
-                  >
-                    <UserPlus size={20} />
-                    <span>Fazer Login</span>
-                  </button>
-                </div>
-              )}
-            </div>
+                  
+                  {/* Botão Telefone */}
+                  {(professional.whatsapp || professional.phone) && (
+                    <button 
+                      className="contact-button phone"
+                      onClick={handlePhoneClick}
+                    >
+                      <Phone size={20} />
+                      <span>{professional.whatsapp || professional.phone}</span>
+                    </button>
+                  )}
 
-            {/* Informações de Contato - Só mostra se tiver acesso */}
-            {hasContactAccess && professional.whatsapp && (
-              <div className="contact-card">
-                <h3 className="card-title">Informações de Contato</h3>
-                
-                <div className="contact-list">
-                  <div className="contact-item">
-                    <Phone size={18} />
-                    <div>
-                      <p className="contact-label">WhatsApp</p>
-                      <p className="contact-value">{professional.whatsapp}</p>
-                    </div>
-                  </div>
-                  
-                  {professional.phone && (
-                    <div className="contact-item">
-                      <Phone size={18} />
-                      <div>
-                        <p className="contact-label">Telefone</p>
-                        <p className="contact-value">{professional.phone}</p>
-                      </div>
-                    </div>
-                  )}
-                  
+                  {/* Endereço */}
                   {professional.business_address && (
-                    <div className="contact-item">
+                    <div className="contact-info-item">
                       <MapPin size={18} />
                       <div>
                         <p className="contact-label">Endereço</p>
@@ -454,68 +399,83 @@ const ProfessionalProfile = () => {
                       </div>
                     </div>
                   )}
+                  
+                  {/* Redes Sociais */}
+                  {professional.social_media && (
+                    <div className="social-links">
+                      {professional.social_media.instagram && (
+                        <a 
+                          href={professional.social_media.instagram}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="social-link"
+                        >
+                          <Instagram size={20} />
+                        </a>
+                      )}
+                      {professional.social_media.linkedin && (
+                        <a 
+                          href={professional.social_media.linkedin}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="social-link"
+                        >
+                          <Linkedin size={20} />
+                        </a>
+                      )}
+                      {professional.social_media.youtube && (
+                        <a 
+                          href={professional.social_media.youtube}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="social-link"
+                        >
+                          <Youtube size={20} />
+                        </a>
+                      )}
+                      {professional.social_media.website && (
+                        <a 
+                          href={professional.social_media.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="social-link"
+                        >
+                          <Globe size={20} />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="contact-locked">
+                  <Lock size={40} />
+                  <p>Faça login para ver as informações de contato</p>
+                  <button 
+                    className="login-button"
+                    onClick={() => {
+                      localStorage.setItem('redirectAfterLogin', window.location.pathname);
+                      navigate('/login');
+                    }}
+                  >
+                    <UserPlus size={18} />
+                    Fazer Login
+                  </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* Redes Sociais - Só mostra se tiver acesso */}
-            {hasContactAccess && professional.social_media && Object.values(professional.social_media).some(link => link) && (
-              <div className="social-card">
-                <h3 className="card-title">Redes Sociais</h3>
-                
-                <div className="social-list">
-                  {professional.social_media.instagram && (
-                    <a
-                      href={professional.social_media.instagram}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="social-link"
-                    >
-                      <Instagram size={18} />
-                      <span>Instagram</span>
-                      <ExternalLink size={14} />
-                    </a>
-                  )}
-                  
-                  {professional.social_media.linkedin && (
-                    <a
-                      href={professional.social_media.linkedin}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="social-link"
-                    >
-                      <Linkedin size={18} />
-                      <span>LinkedIn</span>
-                      <ExternalLink size={14} />
-                    </a>
-                  )}
-                  
-                  {professional.social_media.youtube && (
-                    <a
-                      href={professional.social_media.youtube}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="social-link"
-                    >
-                      <Youtube size={18} />
-                      <span>YouTube</span>
-                      <ExternalLink size={14} />
-                    </a>
-                  )}
-                  
-                  {professional.social_media.website && (
-                    <a
-                      href={professional.social_media.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="social-link"
-                    >
-                      <Globe size={18} />
-                      <span>Website</span>
-                      <ExternalLink size={14} />
-                    </a>
-                  )}
+            {/* Card de Indicação */}
+            {isAuthenticated && user?.user_type === 'professional' && (
+              <div className="indicate-card">
+                <div className="indicate-header">
+                  <Award size={24} />
+                  <h3>Indique este profissional</h3>
                 </div>
+                <p>Conhece o trabalho e gostaria de indicar?</p>
+                <button className="indicate-button">
+                  <ExternalLink size={18} />
+                  Fazer Indicação
+                </button>
               </div>
             )}
           </aside>
@@ -524,38 +484,46 @@ const ProfessionalProfile = () => {
 
       {/* Modal de Projeto */}
       {selectedProject && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={closeModal}>
+        <div className="project-modal-overlay" onClick={closeProjectModal}>
+          <div className="project-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={closeProjectModal}>
               <X size={24} />
             </button>
             
-            <div className="modal-body">
+            <div className="modal-content">
               {selectedProject.images && selectedProject.images.length > 0 && (
-                <div className="modal-gallery">
-                  <img
-                    src={selectedProject.images[currentImageIndex]}
-                    alt={selectedProject.title}
-                    className="modal-image"
-                    onError={(e) => {
-                      e.target.src = 'https://placehold.co/800x600/e2e8f0/64748b?text=Sem+Imagem';
-                    }}
-                  />
+                <div className="modal-images">
+                  <div className="main-image-container">
+                    <img
+                      src={selectedProject.images[currentImageIndex]}
+                      alt={`${selectedProject.title} - Imagem ${currentImageIndex + 1}`}
+                      className="modal-main-image"
+                    />
+                    
+                    {selectedProject.images.length > 1 && (
+                      <>
+                        <button className="image-nav prev" onClick={previousImage}>
+                          <ChevronLeft size={30} />
+                        </button>
+                        <button className="image-nav next" onClick={nextImage}>
+                          <ChevronRight size={30} />
+                        </button>
+                        <div className="image-counter">
+                          {currentImageIndex + 1} / {selectedProject.images.length}
+                        </div>
+                      </>
+                    )}
+                  </div>
                   
                   {selectedProject.images.length > 1 && (
                     <>
-                      <button className="gallery-nav gallery-prev" onClick={prevImage}>
-                        <ChevronLeft size={24} />
-                      </button>
-                      <button className="gallery-nav gallery-next" onClick={nextImage}>
-                        <ChevronRight size={24} />
-                      </button>
-                      
-                      <div className="gallery-indicators">
-                        {selectedProject.images.map((_, index) => (
-                          <button
+                      <div className="image-thumbnails">
+                        {selectedProject.images.map((image, index) => (
+                          <img
                             key={index}
-                            className={`indicator ${index === currentImageIndex ? 'active' : ''}`}
+                            src={image}
+                            alt={`Miniatura ${index + 1}`}
+                            className={`thumbnail ${index === currentImageIndex ? 'active' : ''}`}
                             onClick={() => setCurrentImageIndex(index)}
                           />
                         ))}

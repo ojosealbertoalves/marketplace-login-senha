@@ -1,7 +1,7 @@
-// frontend/src/components/Header.jsx - COM AUTENTICAÇÃO
+// frontend/src/components/Header.jsx - COM LINK PARA PERFIL
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, User, Menu, X, LogIn, LogOut, UserPlus } from 'lucide-react';
+import { Search, User, Menu, X, LogIn, LogOut, UserPlus, UserCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import './Header.css';
 
@@ -43,10 +43,10 @@ const Header = () => {
             {/* Botões de autenticação */}
             {isAuthenticated ? (
               <div className="auth-menu">
-                <div className="user-info">
-                  <User size={18} />
+                <Link to="/perfil" className="user-info">
+                  <UserCircle size={18} />
                   <span>Olá, {user?.name?.split(' ')[0]}</span>
-                </div>
+                </Link>
                 <button onClick={handleLogout} className="nav-link logout-button">
                   <LogOut size={18} />
                   Sair
@@ -97,10 +97,14 @@ const Header = () => {
             {/* Menu mobile - autenticação */}
             {isAuthenticated ? (
               <>
-                <div className="mobile-user-info">
-                  <User size={18} />
-                  <span>Olá, {user?.name?.split(' ')[0]}</span>
-                </div>
+                <Link 
+                  to="/perfil" 
+                  className="mobile-user-info"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <UserCircle size={18} />
+                  <span>Meu Perfil</span>
+                </Link>
                 <button 
                   onClick={handleLogout}
                   className="mobile-nav-link logout-mobile"
