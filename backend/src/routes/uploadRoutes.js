@@ -26,4 +26,6 @@ router.delete('/profile-photo',
   uploadController.deleteProfilePhoto
 );
 
+console.log('✅ Rotas de upload configuradas');
+
 export default router;

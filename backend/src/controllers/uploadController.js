@@ -7,6 +7,8 @@ export const uploadProfilePhoto = async (req, res) => {
   try {
     const userId = req.user.id;
     
+    console.log('📤 Upload iniciado para usuário:', userId);
+    
     if (!req.file) {
       return res.status(400).json({
         error: 'Nenhuma imagem foi enviada'
@@ -14,6 +16,7 @@ export const uploadProfilePhoto = async (req, res) => {
     }
 
     const photoUrl = req.file.path;
+    console.log('📷 URL da foto:', photoUrl);
 
     // Buscar usuário
     const user = await db.User.findByPk(userId);
@@ -26,6 +29,7 @@ export const uploadProfilePhoto = async (req, res) => {
 
     // Deletar foto antiga do Cloudinary se existir
     if (user.profile_photo) {
+      console.log('🗑️ Deletando foto antiga:', user.profile_photo);
       const oldPublicId = getPublicIdFromUrl(user.profile_photo);
       if (oldPublicId) {
         await deleteImage(oldPublicId);
@@ -44,7 +48,7 @@ export const uploadProfilePhoto = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erro ao fazer upload da foto de perfil:', error);
+    console.error('❌ Erro ao fazer upload da foto de perfil:', error);
     res.status(500).json({
       error: 'Erro ao fazer upload da foto',
       details: error.message
@@ -72,7 +76,7 @@ export const uploadPortfolioPhotos = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erro ao fazer upload das fotos de portfólio:', error);
+    console.error('❌ Erro ao fazer upload das fotos de portfólio:', error);
     res.status(500).json({
       error: 'Erro ao fazer upload das fotos',
       details: error.message
@@ -84,25 +88,45 @@ export const uploadPortfolioPhotos = async (req, res) => {
 export const deleteProfilePhoto = async (req, res) => {
   try {
     const userId = req.user.id;
+    
+    console.log('🗑️ Iniciando deleção de foto para usuário:', userId);
 
     const user = await db.User.findByPk(userId);
     
-    if (!user || !user.profile_photo) {
+    if (!user) {
+      console.log('❌ Usuário não encontrado');
+      return res.status(404).json({
+        error: 'Usuário não encontrado'
+      });
+    }
+    
+    if (!user.profile_photo) {
+      console.log('⚠️ Usuário não tem foto de perfil');
       return res.status(404).json({
         error: 'Foto de perfil não encontrada'
       });
     }
 
+    console.log('📸 Foto atual:', user.profile_photo);
+
     // Deletar do Cloudinary
     const publicId = getPublicIdFromUrl(user.profile_photo);
+    console.log('🔑 Public ID:', publicId);
+    
     if (publicId) {
-      await deleteImage(publicId);
+      const deleted = await deleteImage(publicId);
+      if (deleted) {
+        console.log('✅ Foto deletada do Cloudinary');
+      } else {
+        console.log('⚠️ Não foi possível deletar do Cloudinary');
+      }
     }
 
-    // Remover do banco
+    // Remover do banco de dados
     await user.update({ profile_photo: null });
+    console.log('✅ Foto removida do banco de dados');
 
-    console.log(`🗑️ Foto de perfil removida para usuário: ${userId}`);
+    console.log(`🎉 Foto de perfil removida com sucesso para usuário: ${userId}`);
 
     res.json({
       success: true,
@@ -110,7 +134,7 @@ export const deleteProfilePhoto = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erro ao deletar foto de perfil:', error);
+    console.error('❌ Erro ao deletar foto de perfil:', error);
     res.status(500).json({
       error: 'Erro ao deletar foto',
       details: error.message

@@ -1,4 +1,4 @@
-// backend/src/config/cloudinary.js - VERSÃO FINAL
+// backend/src/config/cloudinary.js
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
@@ -8,6 +8,12 @@ cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Teste de configuração (para debug)
+console.log('🔧 Cloudinary configurado:', {
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY ? '***' + process.env.CLOUDINARY_API_KEY.slice(-4) : 'não configurado'
 });
 
 // Storage para fotos de perfil
@@ -42,22 +48,23 @@ export const uploadProfilePhoto = multer({
   }
 });
 
-// Multer upload para fotos de portfólio (múltiplas)
+// Multer upload para fotos de portfólio
 export const uploadPortfolioPhotos = multer({
   storage: portfolioStorage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB por arquivo
+    fileSize: 5 * 1024 * 1024 // 5MB
   }
 });
 
 // Função para deletar imagem do Cloudinary
 export const deleteImage = async (publicId) => {
   try {
-    await cloudinary.uploader.destroy(publicId);
-    console.log(`🗑️ Imagem deletada do Cloudinary: ${publicId}`);
-    return true;
+    console.log('🗑️ Tentando deletar imagem:', publicId);
+    const result = await cloudinary.uploader.destroy(publicId);
+    console.log('✅ Resultado da deleção:', result);
+    return result.result === 'ok';
   } catch (error) {
-    console.error('Erro ao deletar imagem:', error);
+    console.error('❌ Erro ao deletar imagem do Cloudinary:', error);
     return false;
   }
 };
@@ -66,17 +73,27 @@ export const deleteImage = async (publicId) => {
 export const getPublicIdFromUrl = (url) => {
   if (!url) return null;
   
-  const parts = url.split('/');
-  const filename = parts[parts.length - 1];
-  const publicId = filename.split('.')[0];
-  
-  // Incluir pasta no public_id
-  const folderIndex = parts.indexOf('catalogopro');
-  if (folderIndex !== -1) {
-    return parts.slice(folderIndex, parts.length - 1).join('/') + '/' + publicId;
+  try {
+    // URL exemplo: https://res.cloudinary.com/dozqmklvu/image/upload/v1234567890/catalogopro/profiles/abc123.jpg
+    const parts = url.split('/');
+    
+    // Encontrar o índice de 'upload'
+    const uploadIndex = parts.indexOf('upload');
+    if (uploadIndex === -1) return null;
+    
+    // Pegar tudo depois de 'upload' e da versão (v1234...)
+    const afterUpload = parts.slice(uploadIndex + 2); // Pula 'upload' e 'v1234...'
+    
+    // Juntar o caminho e remover a extensão
+    const pathWithExtension = afterUpload.join('/');
+    const publicId = pathWithExtension.substring(0, pathWithExtension.lastIndexOf('.'));
+    
+    console.log('📋 Public ID extraído:', publicId);
+    return publicId;
+  } catch (error) {
+    console.error('❌ Erro ao extrair public_id:', error);
+    return null;
   }
-  
-  return publicId;
 };
 
 export default cloudinary;

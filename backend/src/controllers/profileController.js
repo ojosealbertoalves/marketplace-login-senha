@@ -1,4 +1,4 @@
-// backend/src/controllers/profileController.js - COM SUBCATEGORIAS E IMAGENS
+// backend/src/controllers/profileController.js - VERSÃO FINAL
 import db from '../models/index.js';
 
 // Buscar perfil completo do usuário logado
@@ -92,7 +92,7 @@ export const updateProfessionalInfo = async (req, res) => {
       education,
       whatsapp,
       business_address,
-      subcategories // ✅ NOVO: suporte a subcategorias
+      subcategories
     } = req.body;
 
     const professional = await db.Professional.findOne({
@@ -105,7 +105,6 @@ export const updateProfessionalInfo = async (req, res) => {
       });
     }
 
-    // Atualizar dados profissionais
     await professional.update({
       category_id,
       description,
@@ -115,13 +114,13 @@ export const updateProfessionalInfo = async (req, res) => {
       business_address
     });
 
-    // ✅ Atualizar subcategorias se fornecidas
     if (subcategories && Array.isArray(subcategories)) {
       const subcategoryObjects = await db.Subcategory.findAll({
         where: { id: subcategories }
       });
+      
       await professional.setSubcategories(subcategoryObjects);
-      console.log(`✅ Subcategorias atualizadas: ${subcategories.length} itens`);
+      console.log(`✅ ${subcategories.length} subcategorias vinculadas`);
     }
 
     console.log(`✅ Dados profissionais atualizados para: ${professional.id}`);
@@ -198,16 +197,6 @@ export const addPortfolioItem = async (req, res) => {
       });
     }
 
-    // ✅ Parse images se vier como string
-    let imagesList = images;
-    if (typeof images === 'string') {
-      try {
-        imagesList = JSON.parse(images);
-      } catch (e) {
-        imagesList = [images];
-      }
-    }
-
     const portfolioItem = await db.PortfolioItem.create({
       id: `portfolio-${Date.now()}`,
       professional_id: professional.id,
@@ -216,7 +205,7 @@ export const addPortfolioItem = async (req, res) => {
       project_type,
       area,
       duration,
-      images: imagesList || [],
+      images: images || [],
       completed_at: new Date()
     });
 
@@ -255,9 +244,9 @@ export const updatePortfolioItem = async (req, res) => {
     }
 
     const portfolioItem = await db.PortfolioItem.findOne({
-      where: { 
+      where: {
         id: itemId,
-        professional_id: professional.id 
+        professional_id: professional.id
       }
     });
 
@@ -280,7 +269,7 @@ export const updatePortfolioItem = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Item do portfólio atualizado',
+      message: 'Item atualizado com sucesso',
       item: portfolioItem
     });
 
@@ -310,9 +299,9 @@ export const deletePortfolioItem = async (req, res) => {
     }
 
     const portfolioItem = await db.PortfolioItem.findOne({
-      where: { 
+      where: {
         id: itemId,
-        professional_id: professional.id 
+        professional_id: professional.id
       }
     });
 
@@ -324,11 +313,11 @@ export const deletePortfolioItem = async (req, res) => {
 
     await portfolioItem.destroy();
 
-    console.log(`🗑️ Item do portfólio removido: ${itemId}`);
+    console.log(`✅ Item do portfólio removido: ${itemId}`);
 
     res.json({
       success: true,
-      message: 'Item removido do portfólio'
+      message: 'Item removido com sucesso'
     });
 
   } catch (error) {

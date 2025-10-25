@@ -1,4 +1,4 @@
-// backend/src/controllers/professionalController.js - COM FILTRO DE CLIENTE
+// backend/src/controllers/professionalController.js - VERSÃO FINAL CORRIGIDA
 import db from '../models/index.js';
 
 // 📋 Listar todos os profissionais (FILTRANDO CLIENTES)
@@ -32,12 +32,12 @@ export const getAllProfessionals = async (req, res) => {
         required: false,
         limit: 3
       },
-      // ✨ INCLUIR USER PARA VERIFICAR TIPO
+      // ✨ INCLUIR USER COM PROFILE_PHOTO
       {
         model: db.User,
         as: 'user',
-        required: false, // Não obrigatório para não quebrar profissionais sem user_id
-        attributes: ['id', 'user_type', 'is_active']
+        required: false,
+        attributes: ['id', 'user_type', 'is_active', 'profile_photo'] // ← COM PROFILE_PHOTO
       }
     ];
 
@@ -71,18 +71,20 @@ export const getAllProfessionals = async (req, res) => {
       order: [['created_at', 'DESC']]
     });
 
-    // ✨ FILTRAR CLIENTES NA MEMÓRIA (após buscar do banco)
+    // ✨ FILTRAR CLIENTES NA MEMÓRIA
     const filteredProfessionals = professionals.filter(prof => {
-      // Se não tem user associado, mostrar (profissionais antigos)
       if (!prof.user) return true;
-      
-      // Se tem user, só mostrar se NÃO for cliente
       return prof.user.user_type !== 'client';
     });
 
     // Formatar dados com controle de acesso
     const formattedProfessionals = filteredProfessionals.map(prof => {
       const professional = prof.toJSON();
+      
+      // ✨ COPIAR PROFILE_PHOTO DO USER
+      if (professional.user && professional.user.profile_photo) {
+        professional.profile_photo = professional.user.profile_photo;
+      }
       
       // Se não está autenticado, ocultar informações de contato
       if (!isAuthenticated) {
@@ -101,7 +103,8 @@ export const getAllProfessionals = async (req, res) => {
         id: professional.id,
         name: professional.name,
         email: professional.email,
-        photo: professional.profile_photo,
+        photo: professional.profile_photo, // ← AGORA TEM A FOTO DO USER
+        profile_photo: professional.profile_photo, // ← ADICIONAR TAMBÉM
         category: professional.category?.name || 'Não informado',
         categoryId: professional.category?.id,
         subcategories: professional.subcategories?.map(sub => sub.name) || [],
@@ -123,7 +126,7 @@ export const getAllProfessionals = async (req, res) => {
       success: true,
       data: formattedProfessionals,
       pagination: {
-        total: filteredProfessionals.length, // Usar total filtrado
+        total: filteredProfessionals.length,
         page: parseInt(page),
         limit: parseInt(limit),
         pages: Math.ceil(filteredProfessionals.length / limit)
@@ -164,12 +167,12 @@ export const getProfessionalById = async (req, res) => {
           model: db.PortfolioItem,
           as: 'portfolio'
         },
-        // ✨ INCLUIR USER PARA VERIFICAR TIPO
+        // ✨ INCLUIR USER COM PROFILE_PHOTO
         {
           model: db.User,
           as: 'user',
           required: false,
-          attributes: ['id', 'user_type']
+          attributes: ['id', 'user_type', 'profile_photo'] // ← COM PROFILE_PHOTO
         }
       ]
     });
@@ -189,6 +192,11 @@ export const getProfessionalById = async (req, res) => {
 
     const profData = professional.toJSON();
 
+    // ✨ COPIAR PROFILE_PHOTO DO USER PARA PROFDATA
+    if (professional.user && professional.user.profile_photo) {
+      profData.profile_photo = professional.user.profile_photo;
+    }
+
     // Controle de acesso às informações de contato
     if (!isAuthenticated) {
       delete profData.email;
@@ -201,6 +209,9 @@ export const getProfessionalById = async (req, res) => {
 
     // Remover dados do user
     delete profData.user;
+
+    console.log('✅ Profissional carregado:', profData.name);
+    console.log('📸 Foto do perfil:', profData.profile_photo || 'Sem foto');
 
     res.json({
       success: true,

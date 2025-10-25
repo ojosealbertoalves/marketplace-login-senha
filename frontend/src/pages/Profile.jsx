@@ -1,4 +1,4 @@
-// frontend/src/pages/Profile.jsx - VERSÃO REFATORADA
+// frontend/src/pages/Profile.jsx - VERSÃO COM UPLOAD E REMOÇÃO DE FOTO
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -42,6 +42,10 @@ function Profile() {
   const [portfolioForm, setPortfolioForm] = useState({
     title: '', description: '', project_type: '', images: []
   });
+
+  // Estados para upload de foto
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
 
   // ========== EFEITOS ==========
   useEffect(() => {
@@ -201,7 +205,7 @@ function Profile() {
   const handleCategoryChange = (e) => {
     const newCategoryId = e.target.value;
     setProfileData(prev => ({ ...prev, category_id: newCategoryId }));
-    setSelectedSubcategories([]); // Limpar subcategorias ao mudar categoria
+    setSelectedSubcategories([]);
   };
 
   const handleSubcategoryToggle = (subcategoryId) => {
@@ -218,7 +222,6 @@ function Profile() {
     setMessage({ type: '', text: '' });
 
     try {
-      // Validações
       if (!profileData.name || !profileData.email) {
         throw new Error('Nome e email são obrigatórios');
       }
@@ -227,10 +230,8 @@ function Profile() {
         throw new Error('Categoria é obrigatória para profissionais');
       }
 
-      // Atualizar dados básicos
       await updateBasicInfo();
 
-      // Atualizar dados profissionais se for profissional
       if (isProfessional) {
         await updateProfessionalInfo();
       }
@@ -238,7 +239,6 @@ function Profile() {
       showMessage('success', 'Perfil atualizado com sucesso!');
       setIsEditing(false);
       
-      // Atualizar dados no localStorage
       const updatedUser = { ...user, name: profileData.name, email: profileData.email };
       localStorage.setItem('user', JSON.stringify(updatedUser));
       
@@ -304,11 +304,13 @@ function Profile() {
     setMessage({ type: '', text: '' });
   };
 
-  // ========== UPLOAD DE FOTOS ==========
+  // ========== UPLOAD E REMOÇÃO DE FOTO DE PERFIL ==========
   
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    setIsUploadingPhoto(true);
 
     try {
       validateFile(file);
@@ -322,7 +324,10 @@ function Profile() {
         body: formData
       });
 
-      if (!response.ok) throw new Error('Erro ao fazer upload');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao fazer upload');
+      }
 
       showMessage('success', 'Foto atualizada com sucesso!');
       await loadProfile();
@@ -330,15 +335,49 @@ function Profile() {
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
       showMessage('error', error.message || 'Erro ao fazer upload da foto');
+    } finally {
+      setIsUploadingPhoto(false);
+      // Limpar o input para permitir upload da mesma foto novamente
+      e.target.value = '';
     }
   };
 
+  const handleDeletePhoto = async () => {
+    if (!window.confirm('Deseja realmente remover sua foto de perfil?')) {
+      return;
+    }
+
+    setIsDeletingPhoto(true);
+
+    try {
+      const response = await fetch(`${API_URL}/upload/profile-photo`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao remover foto');
+      }
+
+      showMessage('success', 'Foto removida com sucesso!');
+      await loadProfile();
+
+    } catch (error) {
+      console.error('Erro ao deletar foto:', error);
+      showMessage('error', error.message || 'Erro ao remover foto');
+    } finally {
+      setIsDeletingPhoto(false);
+    }
+  };
+
+  // ========== UPLOAD DE FOTOS DE PORTFÓLIO ==========
+  
   const handlePortfolioPhotosUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
     try {
-      // Validar todos os arquivos
       files.forEach(file => validateFile(file));
 
       const formData = new FormData();
@@ -427,244 +466,272 @@ function Profile() {
       await loadPortfolio();
 
     } catch (error) {
-      console.error('Erro ao remover portfólio:', error);
+      console.error('Erro ao remover item:', error);
       showMessage('error', 'Erro ao remover item do portfólio');
     }
   };
 
   // ========== RENDER ==========
-
+  
   if (loading) {
     return (
-      <div className="profile-loading">
-        <div className="loading-spinner"></div>
-        <p>Carregando perfil...</p>
+      <div className="profile-container">
+        <div className="loading">Carregando perfil...</div>
+      </div>
+    );
+  }
+
+  if (!fullUserData) {
+    return (
+      <div className="profile-container">
+        <div className="error-message">
+          <AlertCircle size={24} />
+          <p>Erro ao carregar dados do perfil</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="profile-container">
-      <div className="profile-content">
-        {/* Header */}
-        <ProfileHeader 
-          user={user}
-          isEditing={isEditing}
-          isSaving={isSaving}
-          onEdit={() => setIsEditing(true)}
-          onCancel={handleCancel}
-          onSave={handleSubmit}
-          onLogout={logout}
-        />
+      {/* Header do Perfil */}
+      <div className="profile-header">
+        <div className="profile-header-content">
+          {/* Foto de Perfil com controles */}
+          <ProfilePhotoSection 
+            photoUrl={fullUserData.profile_photo}
+            isEditing={isEditing}
+            isUploadingPhoto={isUploadingPhoto}
+            isDeletingPhoto={isDeletingPhoto}
+            onPhotoUpload={handlePhotoUpload}
+            onDeletePhoto={handleDeletePhoto}
+          />
 
-        {/* Mensagens */}
-        {message.text && (
-          <MessageAlert type={message.type} text={message.text} />
-        )}
+          <div className="profile-header-info">
+            <h1>{fullUserData.name}</h1>
+            <p className="profile-email">{fullUserData.email}</p>
+            <span className={`user-type-badge ${fullUserData.user_type}`}>
+              {fullUserData.user_type === 'professional' && 'Profissional'}
+              {fullUserData.user_type === 'company' && 'Empresa'}
+              {fullUserData.user_type === 'client' && 'Cliente Final'}
+            </span>
+          </div>
+        </div>
 
-        {/* Foto de Perfil */}
-        <ProfilePhotoSection 
-          fullUserData={fullUserData}
+        {/* Botões de Ação */}
+        <div className="profile-header-actions">
+          {!isEditing ? (
+            <button 
+              className="btn-edit" 
+              onClick={() => setIsEditing(true)}
+            >
+              <Edit2 size={18} />
+              Editar Perfil
+            </button>
+          ) : (
+            <div className="edit-actions">
+              <button 
+                className="btn-cancel" 
+                onClick={handleCancel}
+                disabled={isSaving}
+              >
+                <X size={18} />
+                Cancelar
+              </button>
+              <button 
+                className="btn-save" 
+                onClick={handleSubmit}
+                disabled={isSaving}
+              >
+                <Save size={18} />
+                {isSaving ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Mensagens de Feedback */}
+      {message.text && (
+        <div className={`message ${message.type}`}>
+          {message.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+          <span>{message.text}</span>
+        </div>
+      )}
+
+      {/* Formulário do Perfil */}
+      <form className="profile-form" onSubmit={handleSubmit}>
+        
+        {/* Informações Básicas */}
+        <BasicInfoSection 
           profileData={profileData}
           isEditing={isEditing}
-          onPhotoUpload={handlePhotoUpload}
+          onChange={handleChange}
         />
 
-        {/* Formulário */}
-        <form onSubmit={handleSubmit} className="profile-form">
-          {/* Dados Básicos */}
-          <BasicInfoSection 
+        {/* Informações Profissionais */}
+        {isProfessional && (
+          <ProfessionalInfoSection
+            profileData={profileData}
+            isEditing={isEditing}
+            categories={categories}
+            subcategories={subcategories}
+            selectedSubcategories={selectedSubcategories}
+            onChange={handleChange}
+            onCategoryChange={handleCategoryChange}
+            onSubcategoryToggle={handleSubcategoryToggle}
+          />
+        )}
+
+        {/* Informações da Empresa */}
+        {isCompany && (
+          <CompanyInfoSection
             profileData={profileData}
             isEditing={isEditing}
             onChange={handleChange}
           />
-
-          {/* Dados Profissionais */}
-          {isProfessional && (
-            <ProfessionalInfoSection 
-              profileData={profileData}
-              categories={categories}
-              subcategories={subcategories}
-              selectedSubcategories={selectedSubcategories}
-              isEditing={isEditing}
-              isClient={isClient}
-              onChange={handleChange}
-              onCategoryChange={handleCategoryChange}
-              onSubcategoryToggle={handleSubcategoryToggle}
-            />
-          )}
-
-          {/* Dados da Empresa */}
-          {isCompany && (
-            <CompanyInfoSection 
-              profileData={profileData}
-              isEditing={isEditing}
-              onChange={handleChange}
-            />
-          )}
-
-          {/* Info Cliente Final */}
-          {isClient && <ClientInfoBox />}
-        </form>
-
-        {/* Portfólio */}
-        {isProfessional && (
-          <PortfolioSection 
-            portfolio={portfolio}
-            isEditing={isEditing}
-            showPortfolioForm={showPortfolioForm}
-            portfolioForm={portfolioForm}
-            onToggleForm={() => setShowPortfolioForm(!showPortfolioForm)}
-            onFormChange={handlePortfolioFormChange}
-            onAddPortfolio={handleAddPortfolio}
-            onDeletePortfolio={handleDeletePortfolio}
-            onPhotosUpload={handlePortfolioPhotosUpload}
-            onRemovePhoto={handleRemovePortfolioPhoto}
-            onCancelForm={() => {
-              setShowPortfolioForm(false);
-              setPortfolioForm({ title: '', description: '', project_type: '', images: [] });
-            }}
-          />
         )}
-      </div>
+
+        {/* Aviso para Clientes */}
+        {isClient && <ClientInfoBox />}
+
+      </form>
+
+      {/* Portfólio (apenas para profissionais) */}
+      {isProfessional && (
+        <PortfolioSection
+          portfolio={portfolio}
+          isEditing={isEditing}
+          showPortfolioForm={showPortfolioForm}
+          portfolioForm={portfolioForm}
+          onToggleForm={() => setShowPortfolioForm(!showPortfolioForm)}
+          onFormChange={handlePortfolioFormChange}
+          onAddPortfolio={handleAddPortfolio}
+          onDeletePortfolio={handleDeletePortfolio}
+          onPhotosUpload={handlePortfolioPhotosUpload}
+          onRemovePhoto={handleRemovePortfolioPhoto}
+          onCancelForm={() => {
+            setShowPortfolioForm(false);
+            setPortfolioForm({ title: '', description: '', project_type: '', images: [] });
+          }}
+        />
+      )}
     </div>
   );
 }
 
-// ========== COMPONENTES AUXILIARES ==========
+// ========== COMPONENTES DE SEÇÃO ==========
 
-const ProfileHeader = ({ user, isEditing, isSaving, onEdit, onCancel, onSave, onLogout }) => (
-  <div className="profile-header-section">
-    <div className="profile-title-section">
-      <h1 className="profile-title">Meu Perfil</h1>
-      <div className="profile-type-badge">
-        {user.user_type === 'professional' && <><User size={16} /> Profissional</>}
-        {user.user_type === 'company' && <><Building size={16} /> Empresa</>}
-        {user.user_type === 'client' && <><User size={16} /> Cliente Final</>}
-      </div>
-    </div>
-    
-    <div className="profile-actions">
-      {!isEditing ? (
-        <>
-          <button type="button" className="btn-edit" onClick={onEdit}>
-            <Edit2 size={18} />
-            Editar Perfil
-          </button>
-          <button type="button" className="btn-logout" onClick={onLogout}>
-            Sair
-          </button>
-        </>
+const ProfilePhotoSection = ({ 
+  photoUrl, 
+  isEditing, 
+  isUploadingPhoto,
+  isDeletingPhoto,
+  onPhotoUpload, 
+  onDeletePhoto 
+}) => (
+  <div className="profile-photo-wrapper">
+    <div className="profile-photo">
+      {photoUrl ? (
+        <img src={photoUrl} alt="Foto de perfil" />
       ) : (
-        <>
-          <button type="button" className="btn-cancel" onClick={onCancel} disabled={isSaving}>
-            <X size={18} />
-            Cancelar
-          </button>
-          <button type="submit" className="btn-save" onClick={onSave} disabled={isSaving}>
-            <Save size={18} />
-            {isSaving ? 'Salvando...' : 'Salvar'}
-          </button>
-        </>
+        <div className="profile-photo-placeholder">
+          <User size={48} />
+        </div>
       )}
     </div>
-  </div>
-);
+    
+    {isEditing && (
+      <div className="profile-photo-actions">
+        {/* Botão de Upload */}
+        <label 
+          htmlFor="profile-photo-upload" 
+          className={`btn-change-photo ${isUploadingPhoto ? 'loading' : ''}`}
+          title="Alterar foto"
+        >
+          <Camera size={16} />
+          {isUploadingPhoto ? 'Enviando...' : 'Alterar'}
+          <input
+            type="file"
+            id="profile-photo-upload"
+            accept="image/*"
+            onChange={onPhotoUpload}
+            style={{ display: 'none' }}
+            disabled={isUploadingPhoto || isDeletingPhoto}
+          />
+        </label>
 
-const MessageAlert = ({ type, text }) => (
-  <div className={`profile-message ${type}`}>
-    {type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
-    <span>{text}</span>
-  </div>
-);
-
-const ProfilePhotoSection = ({ fullUserData, profileData, isEditing, onPhotoUpload }) => (
-  <div className="profile-section">
-    <h2 className="section-title">Foto de Perfil</h2>
-    <div className="profile-photo-section">
-      <div className="profile-photo-wrapper">
-        <img
-          src={fullUserData?.profile_photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.name)}&size=200&background=667eea&color=fff`}
-          alt={profileData.name}
-          className="profile-photo"
-        />
-        {isEditing && (
-          <label className="photo-upload-overlay" htmlFor="photo-upload">
-            <Camera size={24} />
-            <span>Alterar foto</span>
-            <input
-              type="file"
-              id="photo-upload"
-              accept="image/*"
-              onChange={onPhotoUpload}
-              style={{ display: 'none' }}
-            />
-          </label>
+        {/* Botão de Remover - apenas se tiver foto */}
+        {photoUrl && (
+          <button
+            type="button"
+            className={`btn-delete-photo ${isDeletingPhoto ? 'loading' : ''}`}
+            onClick={onDeletePhoto}
+            disabled={isUploadingPhoto || isDeletingPhoto}
+            title="Remover foto"
+          >
+            <Trash2 size={16} />
+            {isDeletingPhoto ? 'Removendo...' : 'Remover'}
+          </button>
         )}
       </div>
-      <p className="photo-help-text">
-        <AlertCircle size={14} />
-        Formatos: JPG, PNG, WEBP - Máximo 5MB
-      </p>
-    </div>
+    )}
   </div>
 );
 
 const BasicInfoSection = ({ profileData, isEditing, onChange }) => (
   <div className="profile-section">
-    <h2 className="section-title">Dados Básicos</h2>
+    <h2 className="section-title">Informações Básicas</h2>
     
-    <div className="form-row">
-      <div className="form-group">
-        <label htmlFor="name">Nome Completo *</label>
-        <div className="input-with-icon">
-          <User size={18} />
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={profileData.name}
-            onChange={onChange}
-            disabled={!isEditing}
-            required
-          />
-        </div>
+    <div className="form-group">
+      <label htmlFor="name">Nome Completo *</label>
+      <div className="input-with-icon">
+        <User size={18} />
+        <input
+          type="text"
+          id="name"
+          name="name"
+          value={profileData.name}
+          onChange={onChange}
+          disabled={!isEditing}
+          required
+        />
       </div>
+    </div>
 
-      <div className="form-group">
-        <label htmlFor="email">Email *</label>
-        <div className="input-with-icon">
-          <Mail size={18} />
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={profileData.email}
-            onChange={onChange}
-            disabled={!isEditing}
-            required
-          />
-        </div>
+    <div className="form-group">
+      <label htmlFor="email">Email *</label>
+      <div className="input-with-icon">
+        <Mail size={18} />
+        <input
+          type="email"
+          id="email"
+          name="email"
+          value={profileData.email}
+          onChange={onChange}
+          disabled={!isEditing}
+          required
+        />
+      </div>
+    </div>
+
+    <div className="form-group">
+      <label htmlFor="phone">Telefone</label>
+      <div className="input-with-icon">
+        <Phone size={18} />
+        <input
+          type="tel"
+          id="phone"
+          name="phone"
+          value={profileData.phone}
+          onChange={onChange}
+          disabled={!isEditing}
+          placeholder="(00) 00000-0000"
+        />
       </div>
     </div>
 
     <div className="form-row">
-      <div className="form-group">
-        <label htmlFor="phone">Telefone</label>
-        <div className="input-with-icon">
-          <Phone size={18} />
-          <input
-            type="tel"
-            id="phone"
-            name="phone"
-            value={profileData.phone}
-            onChange={onChange}
-            disabled={!isEditing}
-            placeholder="(00) 00000-0000"
-          />
-        </div>
-      </div>
-
       <div className="form-group">
         <label htmlFor="city">Cidade</label>
         <div className="input-with-icon">
@@ -680,8 +747,8 @@ const BasicInfoSection = ({ profileData, isEditing, onChange }) => (
         </div>
       </div>
 
-      <div className="form-group form-group-small">
-        <label htmlFor="state">UF</label>
+      <div className="form-group">
+        <label htmlFor="state">Estado</label>
         <input
           type="text"
           id="state"
@@ -690,7 +757,7 @@ const BasicInfoSection = ({ profileData, isEditing, onChange }) => (
           onChange={onChange}
           disabled={!isEditing}
           maxLength="2"
-          placeholder="SP"
+          placeholder="GO"
         />
       </div>
     </div>
@@ -699,18 +766,17 @@ const BasicInfoSection = ({ profileData, isEditing, onChange }) => (
 
 const ProfessionalInfoSection = ({ 
   profileData, 
+  isEditing, 
   categories, 
   subcategories, 
-  selectedSubcategories, 
-  isEditing, 
-  isClient,
+  selectedSubcategories,
   onChange, 
-  onCategoryChange,
+  onCategoryChange, 
   onSubcategoryToggle 
 }) => (
   <div className="profile-section">
     <h2 className="section-title">Dados Profissionais</h2>
-    
+
     <div className="form-group">
       <label htmlFor="category_id">Categoria Principal *</label>
       <select
@@ -723,22 +789,24 @@ const ProfessionalInfoSection = ({
       >
         <option value="">Selecione uma categoria</option>
         {categories.map(cat => (
-          <option key={cat.id} value={cat.id}>{cat.name}</option>
+          <option key={cat.id} value={cat.id}>
+            {cat.name}
+          </option>
         ))}
       </select>
     </div>
 
-    {/* Subcategorias */}
-    {isEditing && subcategories.length > 0 && (
+    {subcategories.length > 0 && (
       <div className="form-group">
-        <label>Subcategorias (opcional)</label>
+        <label>Subcategorias</label>
         <div className="subcategories-grid">
           {subcategories.map(sub => (
-            <label key={sub.id} className="checkbox-label">
+            <label key={sub.id} className="subcategory-checkbox">
               <input
                 type="checkbox"
                 checked={selectedSubcategories.includes(sub.id)}
                 onChange={() => onSubcategoryToggle(sub.id)}
+                disabled={!isEditing}
               />
               <span>{sub.name}</span>
             </label>
@@ -747,23 +815,8 @@ const ProfessionalInfoSection = ({
       </div>
     )}
 
-    {/* Mostrar subcategorias selecionadas quando não está editando */}
-    {!isEditing && selectedSubcategories.length > 0 && subcategories.length > 0 && (
-      <div className="form-group">
-        <label>Subcategorias</label>
-        <div className="selected-subcategories">
-          {selectedSubcategories.map(id => {
-            const sub = subcategories.find(s => s.id === id);
-            return sub ? (
-              <span key={id} className="subcategory-tag">{sub.name}</span>
-            ) : null;
-          })}
-        </div>
-      </div>
-    )}
-
     <div className="form-group">
-      <label htmlFor="description">Descrição dos Serviços</label>
+      <label htmlFor="description">Sobre Você</label>
       <textarea
         id="description"
         name="description"
@@ -771,7 +824,7 @@ const ProfessionalInfoSection = ({
         onChange={onChange}
         disabled={!isEditing}
         rows="4"
-        placeholder="Descreva os serviços que você oferece..."
+        placeholder="Conte um pouco sobre você e seu trabalho..."
       />
     </div>
 
@@ -882,7 +935,6 @@ const PortfolioSection = ({
       <p className="portfolio-info-text">Clique em "Editar Perfil" para adicionar projetos ao seu portfólio</p>
     )}
 
-    {/* Formulário Portfolio */}
     {isEditing && showPortfolioForm && (
       <PortfolioForm 
         portfolioForm={portfolioForm}
@@ -894,7 +946,6 @@ const PortfolioSection = ({
       />
     )}
 
-    {/* Lista Portfolio */}
     {portfolio.length === 0 && isEditing && !showPortfolioForm ? (
       <div className="portfolio-empty">
         <ImageIcon size={48} />
@@ -957,7 +1008,6 @@ const PortfolioForm = ({
       />
     </div>
 
-    {/* Upload de fotos */}
     <div className="form-group">
       <label>Fotos do Projeto</label>
       <div className="photo-upload-area">
@@ -976,7 +1026,6 @@ const PortfolioForm = ({
         <small>Máximo 10 fotos - 5MB cada</small>
       </div>
 
-      {/* Preview das fotos */}
       {portfolioForm.images?.length > 0 && (
         <div className="photo-preview-grid">
           {portfolioForm.images.map((url, index) => (
