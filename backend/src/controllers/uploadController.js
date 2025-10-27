@@ -1,4 +1,4 @@
-// backend/src/controllers/uploadController.js
+// backend/src/controllers/uploadController.js - VERSÃO FINAL
 import db from '../models/index.js';
 import { deleteImage, getPublicIdFromUrl } from '../config/cloudinary.js';
 
@@ -44,41 +44,15 @@ export const uploadProfilePhoto = async (req, res) => {
     res.json({
       success: true,
       message: 'Foto de perfil atualizada com sucesso',
-      photoUrl
+      data: {
+        imageUrl: photoUrl
+      }
     });
 
   } catch (error) {
     console.error('❌ Erro ao fazer upload da foto de perfil:', error);
     res.status(500).json({
       error: 'Erro ao fazer upload da foto',
-      details: error.message
-    });
-  }
-};
-
-// Upload de fotos de portfólio
-export const uploadPortfolioPhotos = async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({
-        error: 'Nenhuma imagem foi enviada'
-      });
-    }
-
-    const photoUrls = req.files.map(file => file.path);
-
-    console.log(`✅ ${photoUrls.length} fotos de portfólio enviadas`);
-
-    res.json({
-      success: true,
-      message: `${photoUrls.length} foto(s) enviada(s) com sucesso`,
-      photoUrls
-    });
-
-  } catch (error) {
-    console.error('❌ Erro ao fazer upload das fotos de portfólio:', error);
-    res.status(500).json({
-      error: 'Erro ao fazer upload das fotos',
       details: error.message
     });
   }

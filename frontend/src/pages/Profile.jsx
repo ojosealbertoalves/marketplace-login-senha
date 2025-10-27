@@ -1,1102 +1,531 @@
-// frontend/src/pages/Profile.jsx - VERSÃO COM UPLOAD E REMOÇÃO DE FOTO
+// frontend/src/components/Profile.jsx - VERSÃO FINAL COM /ME
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  User, Building, Mail, Phone, MapPin, Edit2, Save, X, 
-  AlertCircle, CheckCircle, Camera, Plus, Trash2, Image as ImageIcon 
-} from 'lucide-react';
+import api from '../services/api';
 import './Profile.css';
 
-// ========== CONSTANTES ==========
-const API_URL = 'http://localhost:3001/api';
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-
-// ========== COMPONENTE PRINCIPAL ==========
-function Profile() {
-  const navigate = useNavigate();
-  const { user, token, logout, isClient, isProfessional, isCompany } = useAuth();
+const Profile = () => {
+  const { user, updateUser } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   
-  // Estados principais
-  const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
-  
-  // Dados do perfil
-  const [fullUserData, setFullUserData] = useState(null);
-  const [profileData, setProfileData] = useState({
-    name: '', email: '', phone: '', city: '', state: '',
-    category_id: '', description: '', experience: '', education: '',
-    companyName: '', website: ''
-  });
-  
-  // Categorias e subcategorias
-  const [categories, setCategories] = useState([]);
-  const [subcategories, setSubcategories] = useState([]);
-  const [selectedSubcategories, setSelectedSubcategories] = useState([]);
-  
-  // Portfólio
-  const [portfolio, setPortfolio] = useState([]);
-  const [showPortfolioForm, setShowPortfolioForm] = useState(false);
-  const [portfolioForm, setPortfolioForm] = useState({
-    title: '', description: '', project_type: '', images: []
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    city: '',
+    state: '',
+    description: '',
+    experience: '',
+    education: '',
+    whatsapp: '',
+    business_address: '',
+    google_maps_link: '',
+    category_id: '',
+    subcategories: []
   });
 
-  // Estados para upload de foto
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // ========== EFEITOS ==========
-  useEffect(() => {
-    if (!user || !token) {
-      navigate('/login');
-      return;
-    }
-    loadData();
-  }, [user, token, navigate]);
+  // 📸 ESTADOS PARA PORTFOLIO
+  const [portfolioImages, setPortfolioImages] = useState([]);
+  const [selectedPortfolioFiles, setSelectedPortfolioFiles] = useState([]);
+  const [portfolioPreview, setPortfolioPreview] = useState([]);
+  const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
+  const [professionalId, setProfessionalId] = useState(null);
 
   useEffect(() => {
-    if (profileData.category_id) {
-      loadSubcategories(profileData.category_id);
-    } else {
-      setSubcategories([]);
-      setSelectedSubcategories([]);
+    if (user) {
+      loadUserData();
     }
-  }, [profileData.category_id]);
+  }, [user]);
 
-  // ========== FUNÇÕES DE CARREGAMENTO ==========
-  
-  const loadData = async () => {
+  const loadUserData = async () => {
     try {
-      await Promise.all([
-        loadProfile(),
-        loadCategories(),
-        isProfessional && loadPortfolio()
-      ]);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      showMessage('error', 'Erro ao carregar dados do perfil');
-    }
-  };
-
-  const loadProfile = async () => {
-    try {
-      const response = await fetch(`${API_URL}/profile`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      setLoading(true);
+      
+      // ✅ MUDANÇA: usar /me ao invés de /professionals/:id
+      const response = await api.get('/professionals/me');
+      const professional = response.data.data;
+      
+      setProfessionalId(professional.id);
+      
+      setFormData({
+        name: professional.name || '',
+        email: professional.email || '',
+        phone: professional.phone || '',
+        city: professional.city || '',
+        state: professional.state || '',
+        description: professional.description || '',
+        experience: professional.experience || '',
+        education: professional.education || '',
+        whatsapp: professional.whatsapp || '',
+        business_address: professional.businessAddress || '',
+        google_maps_link: professional.googleMapsLink || '',
+        category_id: professional.categoryId || '',
+        subcategories: professional.subcategories || []
       });
 
-      if (!response.ok) throw new Error('Erro ao carregar perfil');
-
-      const data = await response.json();
-      setFullUserData(data.user);
-      
-      const mapped = mapProfileData(data.user);
-      setProfileData(mapped);
-      
-      // Carregar subcategorias selecionadas
-      if (data.user.professionalProfile?.subcategories?.length > 0) {
-        setSelectedSubcategories(
-          data.user.professionalProfile.subcategories.map(sub => sub.id)
-        );
+      if (professional.profile_photo) {
+        setPhotoPreview(professional.profile_photo);
       }
 
-      setLoading(false);
-    } catch (error) {
-      console.error('Erro ao carregar perfil:', error);
-      showMessage('error', 'Erro ao carregar perfil');
+      await loadPortfolio(professional.id);
+
+    } catch (err) {
+      console.error('Erro ao carregar dados:', err);
+      setError('Erro ao carregar seus dados');
+    } finally {
       setLoading(false);
     }
   };
 
-  const loadCategories = async () => {
+  // 📸 CARREGAR PORTFOLIO DO BACKEND
+  const loadPortfolio = async (profId) => {
     try {
-      const response = await fetch(`${API_URL}/categories`);
-      const data = await response.json();
-      const categoriesArray = Array.isArray(data) ? data : (data.data || []);
-      setCategories(categoriesArray);
-    } catch (error) {
-      console.error('Erro ao carregar categorias:', error);
-      showMessage('error', 'Erro ao carregar categorias');
-    }
-  };
-
-  const loadSubcategories = async (categoryId) => {
-    if (!categoryId) {
-      setSubcategories([]);
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_URL}/categories/${categoryId}/subcategories`);
-      const data = await response.json();
-      const subcategoriesArray = Array.isArray(data) ? data : (data.data || []);
-      setSubcategories(subcategoriesArray);
-    } catch (error) {
-      console.error('Erro ao carregar subcategorias:', error);
-      setSubcategories([]);
-    }
-  };
-
-  const loadPortfolio = async () => {
-    try {
-      const response = await fetch(`${API_URL}/profile/portfolio`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPortfolio(data.portfolio || []);
+      const response = await api.get(`/professionals/${profId}/portfolio`);
+      const portfolio = response.data.data;
+      
+      if (portfolio && portfolio.length > 0) {
+        const images = portfolio[0].images || [];
+        setPortfolioImages(images);
+        console.log('📸 Portfolio carregado:', images.length, 'imagens');
       }
-    } catch (error) {
-      console.error('Erro ao carregar portfólio:', error);
+    } catch (err) {
+      console.error('Erro ao carregar portfolio:', err);
     }
   };
 
-  // ========== FUNÇÕES AUXILIARES ==========
-  
-  const mapProfileData = (userData) => {
-    const mapped = {
-      name: userData.name || '',
-      email: userData.email || '',
-      phone: userData.phone || '',
-      city: userData.city || '',
-      state: userData.state || ''
-    };
-
-    if (userData.professionalProfile) {
-      const prof = userData.professionalProfile;
-      mapped.category_id = prof.category_id || '';
-      mapped.description = prof.description || '';
-      mapped.experience = prof.experience || '';
-      mapped.education = prof.education || '';
-    }
-
-    if (userData.companyProfile) {
-      const comp = userData.companyProfile;
-      mapped.companyName = comp.company_name || '';
-      mapped.website = comp.website || '';
-    }
-
-    return mapped;
-  };
-
-  const showMessage = (type, text) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage({ type: '', text: '' }), 5000);
-  };
-
-  const validateFile = (file) => {
-    if (!file.type.startsWith('image/')) {
-      throw new Error('Por favor, selecione uma imagem válida');
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      throw new Error('A imagem deve ter no máximo 5MB');
-    }
-  };
-
-  // ========== HANDLERS DE FORMULÁRIO ==========
-  
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setProfileData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const handleCategoryChange = (e) => {
-    const newCategoryId = e.target.value;
-    setProfileData(prev => ({ ...prev, category_id: newCategoryId }));
-    setSelectedSubcategories([]);
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setProfilePhoto(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const handleSubcategoryToggle = (subcategoryId) => {
-    setSelectedSubcategories(prev =>
-      prev.includes(subcategoryId)
-        ? prev.filter(id => id !== subcategoryId)
-        : [...prev, subcategoryId]
-    );
+  const handlePhotoUpload = async () => {
+    if (!profilePhoto) return;
+
+    try {
+      setUploadingPhoto(true);
+      const formData = new FormData();
+      formData.append('profilePhoto', profilePhoto);
+
+      const response = await api.post('/upload/profile-photo', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.success) {
+        setSuccess('Foto de perfil atualizada com sucesso!');
+        setProfilePhoto(null);
+        updateUser({ ...user, profile_photo: response.data.data.imageUrl });
+      }
+    } catch (err) {
+      setError('Erro ao fazer upload da foto');
+      console.error(err);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  // 📸 HANDLE SELEÇÃO DE IMAGENS DO PORTFOLIO
+  const handlePortfolioChange = (e) => {
+    const files = Array.from(e.target.files);
+    
+    if (files.length === 0) return;
+
+    if (portfolioImages.length + files.length > 10) {
+      setError('Você pode ter no máximo 10 imagens no portfolio');
+      return;
+    }
+
+    const invalidFiles = files.filter(file => file.size > 5 * 1024 * 1024);
+    if (invalidFiles.length > 0) {
+      setError('Cada imagem deve ter no máximo 5MB');
+      return;
+    }
+
+    setSelectedPortfolioFiles(files);
+
+    const previews = files.map(file => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(previews).then(results => {
+      setPortfolioPreview(results);
+    });
+  };
+
+  // 📤 UPLOAD DE IMAGENS DO PORTFOLIO
+  const handlePortfolioUpload = async () => {
+    if (selectedPortfolioFiles.length === 0) {
+      setError('Selecione pelo menos uma imagem');
+      return;
+    }
+
+    if (!professionalId) {
+      setError('ID do profissional não encontrado');
+      return;
+    }
+
+    try {
+      setUploadingPortfolio(true);
+      setError('');
+      
+      const formData = new FormData();
+      selectedPortfolioFiles.forEach(file => {
+        formData.append('images', file);
+      });
+
+      console.log('📤 Enviando', selectedPortfolioFiles.length, 'imagens para o portfolio');
+
+      const response = await api.post(
+        `/professionals/${professionalId}/portfolio/upload`, 
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        }
+      );
+
+      if (response.data.success) {
+        setSuccess(`${response.data.data.uploadedCount} imagem(ns) adicionada(s) ao portfolio!`);
+        
+        setSelectedPortfolioFiles([]);
+        setPortfolioPreview([]);
+        
+        await loadPortfolio(professionalId);
+      }
+    } catch (err) {
+      console.error('Erro ao fazer upload do portfolio:', err);
+      setError(err.response?.data?.error || 'Erro ao fazer upload das imagens');
+    } finally {
+      setUploadingPortfolio(false);
+    }
+  };
+
+  // 🗑️ DELETAR IMAGEM DO PORTFOLIO
+  const handleDeletePortfolioImage = async (index) => {
+    if (!window.confirm('Tem certeza que deseja remover esta imagem?')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const response = await api.delete(
+        `/professionals/${professionalId}/portfolio/image/${index}`
+      );
+
+      if (response.data.success) {
+        setSuccess('Imagem removida com sucesso!');
+        await loadPortfolio(professionalId);
+      }
+    } catch (err) {
+      console.error('Erro ao deletar imagem:', err);
+      setError(err.response?.data?.error || 'Erro ao remover imagem');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSaving(true);
-    setMessage({ type: '', text: '' });
-
-    try {
-      if (!profileData.name || !profileData.email) {
-        throw new Error('Nome e email são obrigatórios');
-      }
-
-      if (isProfessional && !profileData.category_id) {
-        throw new Error('Categoria é obrigatória para profissionais');
-      }
-
-      await updateBasicInfo();
-
-      if (isProfessional) {
-        await updateProfessionalInfo();
-      }
-
-      showMessage('success', 'Perfil atualizado com sucesso!');
-      setIsEditing(false);
-      
-      const updatedUser = { ...user, name: profileData.name, email: profileData.email };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      
-      await loadProfile();
-
-    } catch (error) {
-      console.error('Erro ao salvar perfil:', error);
-      showMessage('error', error.message || 'Erro ao salvar perfil');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const updateBasicInfo = async () => {
-    const response = await fetch(`${API_URL}/profile/basic`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        name: profileData.name,
-        email: profileData.email,
-        phone: profileData.phone,
-        city: profileData.city,
-        state: profileData.state
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Erro ao atualizar dados básicos');
-    }
-  };
-
-  const updateProfessionalInfo = async () => {
-    const response = await fetch(`${API_URL}/profile/professional`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        category_id: profileData.category_id,
-        description: profileData.description,
-        experience: profileData.experience,
-        education: profileData.education,
-        subcategories: selectedSubcategories
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Erro ao atualizar dados profissionais');
-    }
-  };
-
-  const handleCancel = () => {
-    setIsEditing(false);
-    setShowPortfolioForm(false);
-    setPortfolioForm({ title: '', description: '', project_type: '', images: [] });
-    loadProfile();
-    setMessage({ type: '', text: '' });
-  };
-
-  // ========== UPLOAD E REMOÇÃO DE FOTO DE PERFIL ==========
-  
-  const handlePhotoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setIsUploadingPhoto(true);
-
-    try {
-      validateFile(file);
-
-      const formData = new FormData();
-      formData.append('photo', file);
-
-      const response = await fetch(`${API_URL}/upload/profile-photo`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao fazer upload');
-      }
-
-      showMessage('success', 'Foto atualizada com sucesso!');
-      await loadProfile();
-
-    } catch (error) {
-      console.error('Erro ao fazer upload:', error);
-      showMessage('error', error.message || 'Erro ao fazer upload da foto');
-    } finally {
-      setIsUploadingPhoto(false);
-      // Limpar o input para permitir upload da mesma foto novamente
-      e.target.value = '';
-    }
-  };
-
-  const handleDeletePhoto = async () => {
-    if (!window.confirm('Deseja realmente remover sua foto de perfil?')) {
-      return;
-    }
-
-    setIsDeletingPhoto(true);
-
-    try {
-      const response = await fetch(`${API_URL}/upload/profile-photo`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao remover foto');
-      }
-
-      showMessage('success', 'Foto removida com sucesso!');
-      await loadProfile();
-
-    } catch (error) {
-      console.error('Erro ao deletar foto:', error);
-      showMessage('error', error.message || 'Erro ao remover foto');
-    } finally {
-      setIsDeletingPhoto(false);
-    }
-  };
-
-  // ========== UPLOAD DE FOTOS DE PORTFÓLIO ==========
-  
-  const handlePortfolioPhotosUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
-
-    try {
-      files.forEach(file => validateFile(file));
-
-      const formData = new FormData();
-      files.forEach(file => formData.append('photos', file));
-
-      const response = await fetch(`${API_URL}/upload/portfolio-photos`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData
-      });
-
-      if (!response.ok) throw new Error('Erro ao fazer upload');
-
-      const data = await response.json();
-      
-      setPortfolioForm(prev => ({
-        ...prev,
-        images: [...(prev.images || []), ...data.photoUrls]
-      }));
-
-      showMessage('success', `${data.photoUrls.length} foto(s) adicionada(s)!`);
-
-    } catch (error) {
-      console.error('Erro ao fazer upload:', error);
-      showMessage('error', error.message || 'Erro ao fazer upload das fotos');
-    }
-  };
-
-  const handleRemovePortfolioPhoto = (indexToRemove) => {
-    setPortfolioForm(prev => ({
-      ...prev,
-      images: prev.images.filter((_, index) => index !== indexToRemove)
-    }));
-  };
-
-  // ========== PORTFÓLIO ==========
-  
-  const handlePortfolioFormChange = (e) => {
-    const { name, value } = e.target;
-    setPortfolioForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddPortfolio = async (e) => {
-    e.preventDefault();
     
-    if (!portfolioForm.title) {
-      showMessage('error', 'Título do projeto é obrigatório');
-      return;
-    }
-
     try {
-      const response = await fetch(`${API_URL}/profile/portfolio`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(portfolioForm)
-      });
+      setLoading(true);
+      setError('');
+      setSuccess('');
 
-      if (!response.ok) throw new Error('Erro ao adicionar item ao portfólio');
+      const response = await api.put(`/professionals/${professionalId}`, formData);
 
-      showMessage('success', 'Item adicionado ao portfólio!');
-      setShowPortfolioForm(false);
-      setPortfolioForm({ title: '', description: '', project_type: '', images: [] });
-      await loadPortfolio();
-
-    } catch (error) {
-      console.error('Erro ao adicionar portfólio:', error);
-      showMessage('error', 'Erro ao adicionar item ao portfólio');
+      if (response.data.success) {
+        setSuccess('Perfil atualizado com sucesso!');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao atualizar perfil');
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDeletePortfolio = async (itemId) => {
-    if (!window.confirm('Deseja realmente remover este item do portfólio?')) return;
-
-    try {
-      const response = await fetch(`${API_URL}/profile/portfolio/${itemId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) throw new Error('Erro ao remover item');
-
-      showMessage('success', 'Item removido do portfólio!');
-      await loadPortfolio();
-
-    } catch (error) {
-      console.error('Erro ao remover item:', error);
-      showMessage('error', 'Erro ao remover item do portfólio');
-    }
-  };
-
-  // ========== RENDER ==========
-  
-  if (loading) {
-    return (
-      <div className="profile-container">
-        <div className="loading">Carregando perfil...</div>
-      </div>
-    );
-  }
-
-  if (!fullUserData) {
-    return (
-      <div className="profile-container">
-        <div className="error-message">
-          <AlertCircle size={24} />
-          <p>Erro ao carregar dados do perfil</p>
-        </div>
-      </div>
-    );
+  if (loading && !professionalId) {
+    return <div className="profile-loading">Carregando...</div>;
   }
 
   return (
     <div className="profile-container">
-      {/* Header do Perfil */}
-      <div className="profile-header">
-        <div className="profile-header-content">
-          {/* Foto de Perfil com controles */}
-          <ProfilePhotoSection 
-            photoUrl={fullUserData.profile_photo}
-            isEditing={isEditing}
-            isUploadingPhoto={isUploadingPhoto}
-            isDeletingPhoto={isDeletingPhoto}
-            onPhotoUpload={handlePhotoUpload}
-            onDeletePhoto={handleDeletePhoto}
-          />
+      <h1>Meu Perfil</h1>
 
-          <div className="profile-header-info">
-            <h1>{fullUserData.name}</h1>
-            <p className="profile-email">{fullUserData.email}</p>
-            <span className={`user-type-badge ${fullUserData.user_type}`}>
-              {fullUserData.user_type === 'professional' && 'Profissional'}
-              {fullUserData.user_type === 'company' && 'Empresa'}
-              {fullUserData.user_type === 'client' && 'Cliente Final'}
-            </span>
-          </div>
-        </div>
+      {error && <div className="alert alert-error">{error}</div>}
+      {success && <div className="alert alert-success">{success}</div>}
 
-        {/* Botões de Ação */}
-        <div className="profile-header-actions">
-          {!isEditing ? (
-            <button 
-              className="btn-edit" 
-              onClick={() => setIsEditing(true)}
-            >
-              <Edit2 size={18} />
-              Editar Perfil
-            </button>
-          ) : (
-            <div className="edit-actions">
-              <button 
-                className="btn-cancel" 
-                onClick={handleCancel}
-                disabled={isSaving}
-              >
-                <X size={18} />
-                Cancelar
-              </button>
-              <button 
-                className="btn-save" 
-                onClick={handleSubmit}
-                disabled={isSaving}
-              >
-                <Save size={18} />
-                {isSaving ? 'Salvando...' : 'Salvar'}
-              </button>
+      {/* SEÇÃO DE FOTO DE PERFIL */}
+      <div className="profile-section">
+        <h2>Foto de Perfil</h2>
+        <div className="profile-photo-section">
+          {photoPreview && (
+            <div className="photo-preview">
+              <img src={photoPreview} alt="Preview" />
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Mensagens de Feedback */}
-      {message.text && (
-        <div className={`message ${message.type}`}>
-          {message.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
-          <span>{message.text}</span>
-        </div>
-      )}
-
-      {/* Formulário do Perfil */}
-      <form className="profile-form" onSubmit={handleSubmit}>
-        
-        {/* Informações Básicas */}
-        <BasicInfoSection 
-          profileData={profileData}
-          isEditing={isEditing}
-          onChange={handleChange}
-        />
-
-        {/* Informações Profissionais */}
-        {isProfessional && (
-          <ProfessionalInfoSection
-            profileData={profileData}
-            isEditing={isEditing}
-            categories={categories}
-            subcategories={subcategories}
-            selectedSubcategories={selectedSubcategories}
-            onChange={handleChange}
-            onCategoryChange={handleCategoryChange}
-            onSubcategoryToggle={handleSubcategoryToggle}
-          />
-        )}
-
-        {/* Informações da Empresa */}
-        {isCompany && (
-          <CompanyInfoSection
-            profileData={profileData}
-            isEditing={isEditing}
-            onChange={handleChange}
-          />
-        )}
-
-        {/* Aviso para Clientes */}
-        {isClient && <ClientInfoBox />}
-
-      </form>
-
-      {/* Portfólio (apenas para profissionais) */}
-      {isProfessional && (
-        <PortfolioSection
-          portfolio={portfolio}
-          isEditing={isEditing}
-          showPortfolioForm={showPortfolioForm}
-          portfolioForm={portfolioForm}
-          onToggleForm={() => setShowPortfolioForm(!showPortfolioForm)}
-          onFormChange={handlePortfolioFormChange}
-          onAddPortfolio={handleAddPortfolio}
-          onDeletePortfolio={handleDeletePortfolio}
-          onPhotosUpload={handlePortfolioPhotosUpload}
-          onRemovePhoto={handleRemovePortfolioPhoto}
-          onCancelForm={() => {
-            setShowPortfolioForm(false);
-            setPortfolioForm({ title: '', description: '', project_type: '', images: [] });
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-// ========== COMPONENTES DE SEÇÃO ==========
-
-const ProfilePhotoSection = ({ 
-  photoUrl, 
-  isEditing, 
-  isUploadingPhoto,
-  isDeletingPhoto,
-  onPhotoUpload, 
-  onDeletePhoto 
-}) => (
-  <div className="profile-photo-wrapper">
-    <div className="profile-photo">
-      {photoUrl ? (
-        <img src={photoUrl} alt="Foto de perfil" />
-      ) : (
-        <div className="profile-photo-placeholder">
-          <User size={48} />
-        </div>
-      )}
-    </div>
-    
-    {isEditing && (
-      <div className="profile-photo-actions">
-        {/* Botão de Upload */}
-        <label 
-          htmlFor="profile-photo-upload" 
-          className={`btn-change-photo ${isUploadingPhoto ? 'loading' : ''}`}
-          title="Alterar foto"
-        >
-          <Camera size={16} />
-          {isUploadingPhoto ? 'Enviando...' : 'Alterar'}
-          <input
-            type="file"
-            id="profile-photo-upload"
-            accept="image/*"
-            onChange={onPhotoUpload}
-            style={{ display: 'none' }}
-            disabled={isUploadingPhoto || isDeletingPhoto}
-          />
-        </label>
-
-        {/* Botão de Remover - apenas se tiver foto */}
-        {photoUrl && (
-          <button
-            type="button"
-            className={`btn-delete-photo ${isDeletingPhoto ? 'loading' : ''}`}
-            onClick={onDeletePhoto}
-            disabled={isUploadingPhoto || isDeletingPhoto}
-            title="Remover foto"
-          >
-            <Trash2 size={16} />
-            {isDeletingPhoto ? 'Removendo...' : 'Remover'}
-          </button>
-        )}
-      </div>
-    )}
-  </div>
-);
-
-const BasicInfoSection = ({ profileData, isEditing, onChange }) => (
-  <div className="profile-section">
-    <h2 className="section-title">Informações Básicas</h2>
-    
-    <div className="form-group">
-      <label htmlFor="name">Nome Completo *</label>
-      <div className="input-with-icon">
-        <User size={18} />
-        <input
-          type="text"
-          id="name"
-          name="name"
-          value={profileData.name}
-          onChange={onChange}
-          disabled={!isEditing}
-          required
-        />
-      </div>
-    </div>
-
-    <div className="form-group">
-      <label htmlFor="email">Email *</label>
-      <div className="input-with-icon">
-        <Mail size={18} />
-        <input
-          type="email"
-          id="email"
-          name="email"
-          value={profileData.email}
-          onChange={onChange}
-          disabled={!isEditing}
-          required
-        />
-      </div>
-    </div>
-
-    <div className="form-group">
-      <label htmlFor="phone">Telefone</label>
-      <div className="input-with-icon">
-        <Phone size={18} />
-        <input
-          type="tel"
-          id="phone"
-          name="phone"
-          value={profileData.phone}
-          onChange={onChange}
-          disabled={!isEditing}
-          placeholder="(00) 00000-0000"
-        />
-      </div>
-    </div>
-
-    <div className="form-row">
-      <div className="form-group">
-        <label htmlFor="city">Cidade</label>
-        <div className="input-with-icon">
-          <MapPin size={18} />
-          <input
-            type="text"
-            id="city"
-            name="city"
-            value={profileData.city}
-            onChange={onChange}
-            disabled={!isEditing}
-          />
-        </div>
-      </div>
-
-      <div className="form-group">
-        <label htmlFor="state">Estado</label>
-        <input
-          type="text"
-          id="state"
-          name="state"
-          value={profileData.state}
-          onChange={onChange}
-          disabled={!isEditing}
-          maxLength="2"
-          placeholder="GO"
-        />
-      </div>
-    </div>
-  </div>
-);
-
-const ProfessionalInfoSection = ({ 
-  profileData, 
-  isEditing, 
-  categories, 
-  subcategories, 
-  selectedSubcategories,
-  onChange, 
-  onCategoryChange, 
-  onSubcategoryToggle 
-}) => (
-  <div className="profile-section">
-    <h2 className="section-title">Dados Profissionais</h2>
-
-    <div className="form-group">
-      <label htmlFor="category_id">Categoria Principal *</label>
-      <select
-        id="category_id"
-        name="category_id"
-        value={profileData.category_id}
-        onChange={onCategoryChange}
-        disabled={!isEditing}
-        required
-      >
-        <option value="">Selecione uma categoria</option>
-        {categories.map(cat => (
-          <option key={cat.id} value={cat.id}>
-            {cat.name}
-          </option>
-        ))}
-      </select>
-    </div>
-
-    {subcategories.length > 0 && (
-      <div className="form-group">
-        <label>Subcategorias</label>
-        <div className="subcategories-grid">
-          {subcategories.map(sub => (
-            <label key={sub.id} className="subcategory-checkbox">
-              <input
-                type="checkbox"
-                checked={selectedSubcategories.includes(sub.id)}
-                onChange={() => onSubcategoryToggle(sub.id)}
-                disabled={!isEditing}
-              />
-              <span>{sub.name}</span>
+          <div className="photo-upload">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoChange}
+              id="profile-photo-input"
+            />
+            <label htmlFor="profile-photo-input" className="btn btn-secondary">
+              Escolher Foto
             </label>
-          ))}
+            {profilePhoto && (
+              <button
+                type="button"
+                onClick={handlePhotoUpload}
+                disabled={uploadingPhoto}
+                className="btn btn-primary"
+              >
+                {uploadingPhoto ? 'Enviando...' : 'Salvar Foto'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
-    )}
 
-    <div className="form-group">
-      <label htmlFor="description">Sobre Você</label>
-      <textarea
-        id="description"
-        name="description"
-        value={profileData.description}
-        onChange={onChange}
-        disabled={!isEditing}
-        rows="4"
-        placeholder="Conte um pouco sobre você e seu trabalho..."
-      />
-    </div>
+      {/* SEÇÃO DE PORTFOLIO */}
+      <div className="profile-section">
+        <h2>Meu Portfolio</h2>
+        <p className="section-description">
+          Adicione imagens dos seus trabalhos (máximo 10 imagens, 5MB cada)
+        </p>
 
-    <div className="form-group">
-      <label htmlFor="experience">Experiência Profissional</label>
-      <textarea
-        id="experience"
-        name="experience"
-        value={profileData.experience}
-        onChange={onChange}
-        disabled={!isEditing}
-        rows="4"
-        placeholder="Conte sobre sua experiência..."
-      />
-    </div>
+        {portfolioImages.length > 0 && (
+          <div className="portfolio-grid">
+            {portfolioImages.map((image, index) => (
+              <div key={index} className="portfolio-item">
+                <img src={image.url} alt={`Portfolio ${index + 1}`} />
+                <button
+                  type="button"
+                  onClick={() => handleDeletePortfolioImage(index)}
+                  className="btn-delete-portfolio"
+                  title="Remover imagem"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
-    <div className="form-group">
-      <label htmlFor="education">Formação e Certificações</label>
-      <textarea
-        id="education"
-        name="education"
-        value={profileData.education}
-        onChange={onChange}
-        disabled={!isEditing}
-        rows="4"
-        placeholder="Sua formação acadêmica e certificações..."
-      />
-    </div>
-  </div>
-);
-
-const CompanyInfoSection = ({ profileData, isEditing, onChange }) => (
-  <div className="profile-section">
-    <h2 className="section-title">Dados da Empresa</h2>
-    
-    <div className="form-group">
-      <label htmlFor="companyName">Nome da Empresa</label>
-      <div className="input-with-icon">
-        <Building size={18} />
-        <input
-          type="text"
-          id="companyName"
-          name="companyName"
-          value={profileData.companyName}
-          onChange={onChange}
-          disabled={!isEditing}
-        />
-      </div>
-    </div>
-
-    <div className="form-group">
-      <label htmlFor="website">Website (opcional)</label>
-      <input
-        type="url"
-        id="website"
-        name="website"
-        value={profileData.website}
-        onChange={onChange}
-        disabled={!isEditing}
-        placeholder="https://www.suaempresa.com.br"
-      />
-    </div>
-  </div>
-);
-
-const ClientInfoBox = () => (
-  <div className="profile-info-box">
-    <AlertCircle size={20} />
-    <div>
-      <strong>Conta de Cliente Final</strong>
-      <p>
-        Você pode editar suas informações pessoais, mas não pode mudar seu tipo de conta. 
-        Para solicitar mudanças de categoria ou exclusão da conta, envie um email para suporte@catalogopro.com
-      </p>
-    </div>
-  </div>
-);
-
-const PortfolioSection = ({ 
-  portfolio, 
-  isEditing, 
-  showPortfolioForm, 
-  portfolioForm,
-  onToggleForm,
-  onFormChange,
-  onAddPortfolio,
-  onDeletePortfolio,
-  onPhotosUpload,
-  onRemovePhoto,
-  onCancelForm
-}) => (
-  <div className="profile-section">
-    <div className="section-header-with-action">
-      <h2 className="section-title">Portfólio</h2>
-      {isEditing && (
-        <button 
-          type="button"
-          className="btn-add-portfolio"
-          onClick={onToggleForm}
-        >
-          <Plus size={18} />
-          Adicionar Projeto
-        </button>
-      )}
-    </div>
-
-    {!isEditing && portfolio.length === 0 && (
-      <p className="portfolio-info-text">Clique em "Editar Perfil" para adicionar projetos ao seu portfólio</p>
-    )}
-
-    {isEditing && showPortfolioForm && (
-      <PortfolioForm 
-        portfolioForm={portfolioForm}
-        onChange={onFormChange}
-        onSubmit={onAddPortfolio}
-        onCancel={onCancelForm}
-        onPhotosUpload={onPhotosUpload}
-        onRemovePhoto={onRemovePhoto}
-      />
-    )}
-
-    {portfolio.length === 0 && isEditing && !showPortfolioForm ? (
-      <div className="portfolio-empty">
-        <ImageIcon size={48} />
-        <p>Nenhum projeto adicionado ainda</p>
-        <small>Clique em "Adicionar Projeto" para começar</small>
-      </div>
-    ) : (
-      <PortfolioGrid 
-        portfolio={portfolio}
-        isEditing={isEditing}
-        onDelete={onDeletePortfolio}
-      />
-    )}
-  </div>
-);
-
-const PortfolioForm = ({ 
-  portfolioForm, 
-  onChange, 
-  onSubmit, 
-  onCancel, 
-  onPhotosUpload, 
-  onRemovePhoto 
-}) => (
-  <form onSubmit={onSubmit} className="portfolio-form">
-    <div className="form-group">
-      <label htmlFor="portfolio-title">Título do Projeto *</label>
-      <input
-        type="text"
-        id="portfolio-title"
-        name="title"
-        value={portfolioForm.title}
-        onChange={onChange}
-        placeholder="Ex: Reforma residencial completa"
-        required
-      />
-    </div>
-
-    <div className="form-group">
-      <label htmlFor="portfolio-description">Descrição</label>
-      <textarea
-        id="portfolio-description"
-        name="description"
-        value={portfolioForm.description}
-        onChange={onChange}
-        rows="3"
-        placeholder="Descreva o projeto..."
-      />
-    </div>
-
-    <div className="form-group">
-      <label htmlFor="portfolio-type">Tipo de Projeto</label>
-      <input
-        type="text"
-        id="portfolio-type"
-        name="project_type"
-        value={portfolioForm.project_type}
-        onChange={onChange}
-        placeholder="Ex: Residencial, Comercial, Industrial"
-      />
-    </div>
-
-    <div className="form-group">
-      <label>Fotos do Projeto</label>
-      <div className="photo-upload-area">
-        <label htmlFor="portfolio-photos" className="photo-upload-button">
-          <ImageIcon size={20} />
-          Adicionar Fotos
+        <div className="portfolio-upload-section">
           <input
             type="file"
-            id="portfolio-photos"
             accept="image/*"
             multiple
-            onChange={onPhotosUpload}
-            style={{ display: 'none' }}
+            onChange={handlePortfolioChange}
+            id="portfolio-input"
+            disabled={portfolioImages.length >= 10}
           />
-        </label>
-        <small>Máximo 10 fotos - 5MB cada</small>
-      </div>
+          <label 
+            htmlFor="portfolio-input" 
+            className={`btn btn-secondary ${portfolioImages.length >= 10 ? 'disabled' : ''}`}
+          >
+            {portfolioImages.length >= 10 
+              ? 'Limite de 10 imagens atingido' 
+              : 'Escolher Imagens'}
+          </label>
 
-      {portfolioForm.images?.length > 0 && (
-        <div className="photo-preview-grid">
-          {portfolioForm.images.map((url, index) => (
-            <div key={index} className="photo-preview-item">
-              <img src={url} alt={`Preview ${index + 1}`} />
+          {portfolioPreview.length > 0 && (
+            <div className="portfolio-preview-grid">
+              <h3>Novas imagens selecionadas:</h3>
+              <div className="portfolio-grid">
+                {portfolioPreview.map((preview, index) => (
+                  <div key={index} className="portfolio-item preview">
+                    <img src={preview} alt={`Preview ${index + 1}`} />
+                  </div>
+                ))}
+              </div>
               <button
                 type="button"
-                className="remove-photo-btn"
-                onClick={() => onRemovePhoto(index)}
+                onClick={handlePortfolioUpload}
+                disabled={uploadingPortfolio}
+                className="btn btn-primary"
               >
-                <X size={16} />
+                {uploadingPortfolio 
+                  ? 'Enviando...' 
+                  : `Adicionar ${selectedPortfolioFiles.length} imagem(ns)`}
               </button>
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-
-    <div className="portfolio-form-actions">
-      <button type="button" className="btn-cancel" onClick={onCancel}>
-        Cancelar
-      </button>
-      <button type="submit" className="btn-save">
-        Adicionar
-      </button>
-    </div>
-  </form>
-);
-
-const PortfolioGrid = ({ portfolio, isEditing, onDelete }) => (
-  <div className="portfolio-grid">
-    {portfolio.map(item => (
-      <div key={item.id} className="portfolio-item">
-        {item.images?.length > 0 && (
-          <div className="portfolio-item-images">
-            <img 
-              src={item.images[0]} 
-              alt={item.title}
-              className="portfolio-main-image"
-            />
-            {item.images.length > 1 && (
-              <div className="portfolio-image-count">
-                <ImageIcon size={14} />
-                {item.images.length}
-              </div>
-            )}
-          </div>
-        )}
-        
-        <div className="portfolio-item-content">
-          <div className="portfolio-item-header">
-            <h3>{item.title}</h3>
-            {isEditing && (
-              <button
-                type="button"
-                className="btn-delete-portfolio"
-                onClick={() => onDelete(item.id)}
-                title="Remover projeto"
-              >
-                <Trash2 size={16} />
-              </button>
-            )}
-          </div>
-          {item.description && <p className="portfolio-item-description">{item.description}</p>}
-          {item.project_type && (
-            <span className="portfolio-item-type">{item.project_type}</span>
           )}
         </div>
       </div>
-    ))}
-  </div>
-);
+
+      {/* FORMULÁRIO DE DADOS DO PERFIL */}
+      <form onSubmit={handleSubmit} className="profile-form">
+        <div className="profile-section">
+          <h2>Informações Pessoais</h2>
+          
+          <div className="form-group">
+            <label htmlFor="name">Nome *</label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="email">Email *</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="phone">Telefone</label>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="whatsapp">WhatsApp</label>
+            <input
+              type="tel"
+              id="whatsapp"
+              name="whatsapp"
+              value={formData.whatsapp}
+              onChange={handleChange}
+            />
+          </div>
+        </div>
+
+        <div className="profile-section">
+          <h2>Informações Profissionais</h2>
+          
+          <div className="form-group">
+            <label htmlFor="description">Descrição</label>
+            <textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows="4"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="experience">Experiência</label>
+            <textarea
+              id="experience"
+              name="experience"
+              value={formData.experience}
+              onChange={handleChange}
+              rows="3"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="education">Formação</label>
+            <textarea
+              id="education"
+              name="education"
+              value={formData.education}
+              onChange={handleChange}
+              rows="3"
+            />
+          </div>
+        </div>
+
+        <div className="profile-section">
+          <h2>Localização</h2>
+          
+          <div className="form-group">
+            <label htmlFor="city">Cidade</label>
+            <input
+              type="text"
+              id="city"
+              name="city"
+              value={formData.city}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="state">Estado</label>
+            <input
+              type="text"
+              id="state"
+              name="state"
+              value={formData.state}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="business_address">Endereço Comercial</label>
+            <input
+              type="text"
+              id="business_address"
+              name="business_address"
+              value={formData.business_address}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="google_maps_link">Link Google Maps</label>
+            <input
+              type="url"
+              id="google_maps_link"
+              name="google_maps_link"
+              value={formData.google_maps_link}
+              onChange={handleChange}
+            />
+          </div>
+        </div>
+
+        <div className="form-actions">
+          <button type="submit" disabled={loading} className="btn btn-primary">
+            {loading ? 'Salvando...' : 'Salvar Alterações'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
 
 export default Profile;

@@ -1,7 +1,31 @@
-// frontend/src/services/api.js - CORRIGIDO COM CATEGORIAS
+// frontend/src/services/api.js - COM AXIOS E FETCH
+import axios from 'axios';
+
 const API_BASE_URL = 'http://localhost:3001/api';
 
-// ===== AUTENTICAÇÃO =====
+// ===== CONFIGURAÇÃO DO AXIOS =====
+const axiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// Interceptor para adicionar token
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// ===== FUNÇÕES FETCH (mantidas para compatibilidade) =====
 
 export const register = async (userData) => {
   try {
@@ -68,8 +92,6 @@ export const checkEmail = async (email) => {
   }
 };
 
-// ===== PROFISSIONAIS =====
-
 export const getProfessionals = async () => {
   try {
     const token = localStorage.getItem('token');
@@ -81,7 +103,6 @@ export const getProfessionals = async () => {
     const response = await fetch(`${API_BASE_URL}/professionals`, { headers });
     const data = await response.json();
     
-    // A API retorna { success: true, data: [...] }
     return data.data || [];
   } catch (error) {
     console.error('Erro ao buscar profissionais:', error);
@@ -107,8 +128,6 @@ export const getProfessionalById = async (id) => {
   }
 };
 
-// ===== CATEGORIAS =====
-
 export const getCategories = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/categories`);
@@ -119,8 +138,6 @@ export const getCategories = async () => {
     
     const data = await response.json();
     
-    // A API retorna um array direto, não { data: [...] }
-    // Verificar se é array ou objeto com data
     if (Array.isArray(data)) {
       return data;
     }
@@ -142,8 +159,6 @@ export const getSubcategories = async (categoryId) => {
     return [];
   }
 };
-
-// ===== CIDADES =====
 
 export const getCities = async () => {
   try {
@@ -167,7 +182,7 @@ export const getStates = async () => {
   }
 };
 
-// ===== EXPORT COMO OBJETO (para compatibilidade com código existente) =====
+// ===== OBJETO API COM FUNÇÕES FETCH (compatibilidade) =====
 export const apiService = {
   register,
   login,
@@ -180,5 +195,5 @@ export const apiService = {
   getStates
 };
 
-// Export default para compatibilidade
-export default apiService;
+// ===== EXPORT DEFAULT DO AXIOS (para Profile.jsx) =====
+export default axiosInstance;
