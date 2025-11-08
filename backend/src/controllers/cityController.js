@@ -1,5 +1,5 @@
 // backend/src/controllers/cityController.js
-import sequelize from '../config/db.js';
+import sequelize from '../config/database.js';
 
 // 📍 Listar todas as cidades
 export const getAllCities = async (req, res) => {

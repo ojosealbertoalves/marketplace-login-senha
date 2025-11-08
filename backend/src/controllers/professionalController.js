@@ -1,921 +1,440 @@
-// backend/src/controllers/professionalController.js - VERSÃO FINAL COMPLETA
+// backend/src/controllers/professionalController.js - VERSÃO CORRIGIDA COM /ME
 import db from '../models/index.js';
-import { deleteImage, getPublicIdFromUrl } from '../config/cloudinary.js';
+import { Op } from 'sequelize';
 
-// 📋 Listar todos os profissionais (FILTRANDO CLIENTES)
+// 🆕 BUSCAR PROFISSIONAL DO USUÁRIO LOGADO (ROTA /ME)
+export const getProfessionalByUserId = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    console.log('👤 Buscando profissional para userId:', userId);
+
+    // Buscar ou criar profissional automaticamente
+    let professional = await db.Professional.findOne({
+      where: { user_id: userId },
+      include: [
+        {
+          model: db.Category,
+          as: 'category',
+          attributes: ['id', 'name']
+        },
+        {
+          model: db.Subcategory,
+          as: 'subcategories',
+          through: { attributes: [] },
+          attributes: ['id', 'name']
+        }
+      ]
+    });
+
+    // Se não existe, criar automaticamente
+    if (!professional) {
+      console.log('⚠️ Profissional não encontrado, criando automaticamente...');
+      
+      const user = await db.User.findByPk(userId);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'Usuário não encontrado'
+        });
+      }
+
+      professional = await db.Professional.create({
+        user_id: userId,
+        name: user.name || user.email.split('@')[0],
+        email: user.email,
+        profile_photo: user.profile_photo || null,
+        city: user.city || '',
+        state: user.state || '',
+        is_active: true
+      });
+
+      console.log('✅ Perfil profissional criado:', professional.id);
+
+      // Recarregar com associações
+      professional = await db.Professional.findOne({
+        where: { user_id: userId },
+        include: [
+          {
+            model: db.Category,
+            as: 'category',
+            attributes: ['id', 'name']
+          },
+          {
+            model: db.Subcategory,
+            as: 'subcategories',
+            through: { attributes: [] },
+            attributes: ['id', 'name']
+          }
+        ]
+      });
+    }
+
+    // Formatar resposta
+    const response = {
+      id: professional.id,
+      user_id: professional.user_id,
+      name: professional.name,
+      email: professional.email,
+      phone: professional.phone,
+      whatsapp: professional.whatsapp,
+      profile_photo: professional.profile_photo,
+      category_id: professional.category_id,
+      category: professional.category,
+      subcategories: professional.subcategories || [],
+      city: professional.city,
+      state: professional.state,
+      description: professional.description,
+      experience: professional.experience,
+      education: professional.education,
+      business_address: professional.business_address,
+      google_maps_link: professional.google_maps_link,
+      is_active: professional.is_active,
+      created_at: professional.created_at,
+      updated_at: professional.updated_at
+    };
+
+    console.log('✅ Profissional encontrado:', response.id);
+
+    res.json({
+      success: true,
+      data: response
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao buscar profissional:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao buscar dados do profissional',
+      message: error.message
+    });
+  }
+};
+
+// 📋 LISTAR TODOS OS PROFISSIONAIS
 export const getAllProfessionals = async (req, res) => {
   try {
-    const { category, city, state, search, page = 1, limit = 20 } = req.query;
-    const isAuthenticated = !!req.user;
+    const {
+      category,
+      subcategory,
+      city,
+      state,
+      search,
+      page = 1,
+      limit = 20
+    } = req.query;
 
+    const offset = (page - 1) * limit;
     const where = { is_active: true };
-    
-    const include = [
-      {
-        model: db.Category,
-        as: 'category',
-        required: false
-      },
-      {
-        model: db.City,
-        as: 'cityRelation',
-        required: false
-      },
-      {
-        model: db.Subcategory,
-        as: 'subcategories',
-        required: false,
-        through: { attributes: [] }
-      },
-      {
-        model: db.PortfolioItem,
-        as: 'portfolio',
-        required: false,
-        limit: 3
-      },
-      {
-        model: db.User,
-        as: 'user',
-        required: false,
-        attributes: ['id', 'user_type', 'is_active', 'profile_photo']
-      }
-    ];
 
-    if (category) {
-      where.category_id = category;
-    }
-
-    if (city) {
-      where.city_id = city;
-    }
-
-    if (state) {
-      where.state = state;
-    }
-
+    // Filtros
+    if (category) where.category_id = category;
+    if (city) where.city = { [Op.iLike]: `%${city}%` };
+    if (state) where.state = { [Op.iLike]: `%${state}%` };
     if (search) {
-      where[db.Sequelize.Op.or] = [
-        { name: { [db.Sequelize.Op.iLike]: `%${search}%` } },
-        { description: { [db.Sequelize.Op.iLike]: `%${search}%` } }
+      where[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { description: { [Op.iLike]: `%${search}%` } }
       ];
     }
 
-    const offset = (page - 1) * limit;
-
     const { count, rows: professionals } = await db.Professional.findAndCountAll({
       where,
-      include,
-      offset,
+      include: [
+        {
+          model: db.Category,
+          as: 'category',
+          attributes: ['id', 'name']
+        },
+        {
+          model: db.Subcategory,
+          as: 'subcategories',
+          through: { attributes: [] },
+          attributes: ['id', 'name'],
+          ...(subcategory && {
+            where: { id: subcategory }
+          })
+        }
+      ],
       limit: parseInt(limit),
+      offset: parseInt(offset),
       order: [['created_at', 'DESC']]
-    });
-
-    const filteredProfessionals = professionals.filter(prof => {
-      if (!prof.user) return true;
-      return prof.user.user_type !== 'client';
-    });
-
-    const formattedProfessionals = filteredProfessionals.map(prof => {
-      const professional = prof.toJSON();
-      
-      if (professional.user && professional.user.profile_photo) {
-        professional.profile_photo = professional.user.profile_photo;
-      }
-      
-      if (!isAuthenticated) {
-        delete professional.email;
-        delete professional.phone;
-        delete professional.whatsapp;
-        delete professional.business_address;
-        delete professional.google_maps_link;
-        professional.contactRestricted = true;
-      }
-
-      delete professional.user;
-
-      return {
-        id: professional.id,
-        name: professional.name,
-        email: professional.email,
-        photo: professional.profile_photo,
-        profile_photo: professional.profile_photo,
-        category: professional.category?.name || 'Não informado',
-        categoryId: professional.category?.id,
-        subcategories: professional.subcategories?.map(sub => sub.name) || [],
-        city: professional.city || professional.cityRelation?.name || 'Não informado',
-        state: professional.state || 'N/A',
-        description: professional.description,
-        experience: professional.experience,
-        education: professional.education,
-        phone: professional.phone,
-        whatsapp: professional.whatsapp,
-        businessAddress: professional.business_address,
-        googleMapsLink: professional.google_maps_link,
-        portfolio: professional.portfolio || [],
-        contactRestricted: professional.contactRestricted
-      };
     });
 
     res.json({
       success: true,
-      data: formattedProfessionals,
+      data: professionals,
       pagination: {
-        total: filteredProfessionals.length,
+        total: count,
         page: parseInt(page),
         limit: parseInt(limit),
-        pages: Math.ceil(filteredProfessionals.length / limit)
+        totalPages: Math.ceil(count / limit)
       }
     });
 
   } catch (error) {
     console.error('Erro ao listar profissionais:', error);
     res.status(500).json({
-      error: 'Erro ao buscar profissionais',
-      details: error.message
+      success: false,
+      error: 'Erro ao listar profissionais',
+      message: error.message
     });
   }
 };
 
-// 👤 Buscar MEU perfil profissional (pelo user_id do token)
-export const getProfessionalByUserId = async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    const professional = await db.Professional.findOne({
-      where: { user_id: userId },
-      include: [
-        {
-          model: db.Category,
-          as: 'category'
-        },
-        {
-          model: db.City,
-          as: 'cityRelation'
-        },
-        {
-          model: db.Subcategory,
-          as: 'subcategories',
-          through: { attributes: [] }
-        },
-        {
-          model: db.PortfolioItem,
-          as: 'portfolio'
-        },
-        {
-          model: db.User,
-          as: 'user',
-          required: false,
-          attributes: ['id', 'user_type', 'profile_photo']
-        }
-      ]
-    });
-
-    if (!professional) {
-      return res.status(404).json({
-        error: 'Perfil profissional não encontrado. Complete seu cadastro.'
-      });
-    }
-
-    const profData = professional.toJSON();
-
-    if (professional.user && professional.user.profile_photo) {
-      profData.profile_photo = professional.user.profile_photo;
-    }
-
-    delete profData.user;
-
-    console.log('✅ MEU perfil profissional carregado:', profData.name);
-    console.log('📸 Foto do perfil:', profData.profile_photo || 'Sem foto');
-
-    res.json({
-      success: true,
-      data: profData
-    });
-
-  } catch (error) {
-    console.error('Erro ao buscar meu perfil profissional:', error);
-    res.status(500).json({
-      error: 'Erro ao buscar perfil profissional',
-      details: error.message
-    });
-  }
-};
-
-// 👤 Buscar profissional específico por ID
+// 🔍 BUSCAR PROFISSIONAL POR ID
 export const getProfessionalById = async (req, res) => {
   try {
     const { id } = req.params;
-    const isAuthenticated = !!req.user;
 
-    const professional = await db.Professional.findByPk(id, {
+    const professional = await db.Professional.findOne({
+      where: { id, is_active: true },
       include: [
         {
           model: db.Category,
-          as: 'category'
-        },
-        {
-          model: db.City,
-          as: 'cityRelation'
+          as: 'category',
+          attributes: ['id', 'name']
         },
         {
           model: db.Subcategory,
           as: 'subcategories',
-          through: { attributes: [] }
-        },
-        {
-          model: db.PortfolioItem,
-          as: 'portfolio'
-        },
-        {
-          model: db.User,
-          as: 'user',
-          required: false,
-          attributes: ['id', 'user_type', 'profile_photo']
+          through: { attributes: [] },
+          attributes: ['id', 'name']
         }
       ]
     });
 
     if (!professional) {
       return res.status(404).json({
+        success: false,
         error: 'Profissional não encontrado'
       });
     }
-
-    if (professional.user && professional.user.user_type === 'client') {
-      return res.status(404).json({
-        error: 'Profissional não encontrado'
-      });
-    }
-
-    const profData = professional.toJSON();
-
-    if (professional.user && professional.user.profile_photo) {
-      profData.profile_photo = professional.user.profile_photo;
-    }
-
-    if (!isAuthenticated) {
-      delete profData.email;
-      delete profData.phone;
-      delete profData.whatsapp;
-      delete profData.business_address;
-      delete profData.google_maps_link;
-      profData.contactRestricted = true;
-    }
-
-    delete profData.user;
-
-    console.log('✅ Profissional carregado:', profData.name);
-    console.log('📸 Foto do perfil:', profData.profile_photo || 'Sem foto');
 
     res.json({
       success: true,
-      data: profData
+      data: professional
     });
 
   } catch (error) {
     console.error('Erro ao buscar profissional:', error);
     res.status(500).json({
+      success: false,
       error: 'Erro ao buscar profissional',
-      details: error.message
+      message: error.message
     });
   }
 };
 
-// 🔧 Atualizar perfil do profissional
+// ✏️ ATUALIZAR PROFISSIONAL
 export const updateProfessional = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
-    const userType = req.user.user_type;
-
-    const professional = await db.Professional.findByPk(id, {
-      include: [
-        {
-          model: db.User,
-          as: 'user',
-          required: false
-        }
-      ]
-    });
-
-    if (!professional) {
-      return res.status(404).json({
-        error: 'Profissional não encontrado'
-      });
-    }
-
-    if (professional.user && professional.user.user_type === 'client') {
-      return res.status(403).json({
-        error: 'Este perfil não pode ser editado'
-      });
-    }
-
-    if (userType !== 'admin' && professional.user_id !== userId) {
-      return res.status(403).json({
-        error: 'Você não tem permissão para editar este perfil'
-      });
-    }
-
     const {
       name,
-      description,
-      experience,
-      education,
+      email,
       phone,
       whatsapp,
-      business_address,
-      google_maps_link,
       category_id,
       subcategories,
       city,
       state,
-      social_media,
-      tags
-    } = req.body;
-
-    await professional.update({
-      name,
       description,
       experience,
       education,
-      phone,
-      whatsapp,
       business_address,
-      google_maps_link,
-      category_id,
-      city,
-      state,
-      social_media,
-      tags
-    });
+      google_maps_link
+    } = req.body;
 
-    if (subcategories && Array.isArray(subcategories)) {
-      const subcategoryObjects = await db.Subcategory.findAll({
-        where: { id: subcategories }
+    const professional = await db.Professional.findByPk(id);
+
+    if (!professional) {
+      return res.status(404).json({
+        success: false,
+        error: 'Profissional não encontrado'
       });
-      await professional.setSubcategories(subcategoryObjects);
     }
 
-    console.log(`✅ Perfil profissional ${id} atualizado`);
+    // Atualizar dados básicos
+    await professional.update({
+      name: name || professional.name,
+      email: email || professional.email,
+      phone: phone !== undefined ? phone : professional.phone,
+      whatsapp: whatsapp !== undefined ? whatsapp : professional.whatsapp,
+      category_id: category_id || professional.category_id,
+      city: city !== undefined ? city : professional.city,
+      state: state !== undefined ? state : professional.state,
+      description: description !== undefined ? description : professional.description,
+      experience: experience !== undefined ? experience : professional.experience,
+      education: education !== undefined ? education : professional.education,
+      business_address: business_address !== undefined ? business_address : professional.business_address,
+      google_maps_link: google_maps_link !== undefined ? google_maps_link : professional.google_maps_link
+    });
+
+    // Atualizar subcategorias se fornecidas
+    if (subcategories && Array.isArray(subcategories)) {
+      const subcategoryRecords = await db.Subcategory.findAll({
+        where: { id: { [Op.in]: subcategories } }
+      });
+      await professional.setSubcategories(subcategoryRecords);
+    }
+
+    // Recarregar com associações
+    const updatedProfessional = await db.Professional.findByPk(id, {
+      include: [
+        {
+          model: db.Category,
+          as: 'category',
+          attributes: ['id', 'name']
+        },
+        {
+          model: db.Subcategory,
+          as: 'subcategories',
+          through: { attributes: [] },
+          attributes: ['id', 'name']
+        }
+      ]
+    });
 
     res.json({
       success: true,
-      message: 'Perfil atualizado com sucesso',
-      data: professional
+      message: 'Profissional atualizado com sucesso',
+      data: updatedProfessional
     });
 
   } catch (error) {
     console.error('Erro ao atualizar profissional:', error);
     res.status(500).json({
+      success: false,
       error: 'Erro ao atualizar profissional',
-      details: error.message
+      message: error.message
     });
   }
 };
 
-// 🤝 Indicar profissional
-export const indicateProfessional = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id;
-
-    const professional = await db.Professional.findByPk(id);
-    if (!professional) {
-      return res.status(404).json({
-        error: 'Profissional não encontrado'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Indicação registrada com sucesso'
-    });
-
-  } catch (error) {
-    console.error('Erro ao indicar profissional:', error);
-    res.status(500).json({
-      error: 'Erro ao indicar profissional',
-      details: error.message
-    });
-  }
-};
-
-// 📊 Estatísticas do profissional
-export const getProfessionalStats = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const professional = await db.Professional.findByPk(id);
-    if (!professional) {
-      return res.status(404).json({
-        error: 'Profissional não encontrado'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        profileViews: 0,
-        indications: 0,
-        portfolioItems: 0
-      }
-    });
-
-  } catch (error) {
-    console.error('Erro ao buscar estatísticas:', error);
-    res.status(500).json({
-      error: 'Erro ao buscar estatísticas',
-      details: error.message
-    });
-  }
-};
-
-// 📂 Portfolio do profissional (listar todos os projetos)
+// 📂 BUSCAR PORTFOLIO
 export const getProfessionalPortfolio = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const portfolio = await db.PortfolioItem.findAll({
+    const portfolioItems = await db.PortfolioItem.findAll({
       where: { professional_id: id },
       order: [['created_at', 'DESC']]
     });
 
     res.json({
       success: true,
-      data: portfolio
+      data: portfolioItems
     });
 
   } catch (error) {
     console.error('Erro ao buscar portfolio:', error);
     res.status(500).json({
+      success: false,
       error: 'Erro ao buscar portfolio',
-      details: error.message
+      message: error.message
     });
   }
 };
 
-// ➕ CRIAR NOVO PROJETO NO PORTFOLIO
-export const createPortfolioProject = async (req, res) => {
+// ➕ ADICIONAR ITEM AO PORTFOLIO
+export const addPortfolioItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
-    const userType = req.user.user_type;
-    const { title, description, project_type, area, duration } = req.body;
-
-    const professional = await db.Professional.findByPk(id, {
-      include: [{
-        model: db.User,
-        as: 'user',
-        required: false
-      }]
-    });
-
-    if (!professional) {
-      return res.status(404).json({
-        error: 'Profissional não encontrado'
-      });
-    }
-
-    if (userType !== 'admin' && professional.user_id !== userId) {
-      return res.status(403).json({
-        error: 'Você não tem permissão'
-      });
-    }
-
-    const project = await db.PortfolioItem.create({
-      professional_id: id,
-      title: title || 'Novo Projeto',
-      description: description || '',
-      project_type: project_type || '',
-      area: area || '',
-      duration: duration || '',
-      images: []
-    });
-
-    console.log('✅ Novo projeto criado:', project.id);
-
-    res.status(201).json({
-      success: true,
-      message: 'Projeto criado com sucesso',
-      data: project
-    });
-
-  } catch (error) {
-    console.error('❌ Erro ao criar projeto:', error);
-    res.status(500).json({
-      error: 'Erro ao criar projeto',
-      details: error.message
-    });
-  }
-};
-
-// 📤 UPLOAD DE IMAGENS PARA UM PROJETO ESPECÍFICO
-export const uploadProjectImages = async (req, res) => {
-  try {
-    const { id, projectId } = req.params;
-    const userId = req.user.id;
-    const userType = req.user.user_type;
-
-    const professional = await db.Professional.findByPk(id, {
-      include: [{
-        model: db.User,
-        as: 'user',
-        required: false
-      }]
-    });
-
-    if (!professional) {
-      return res.status(404).json({
-        error: 'Profissional não encontrado'
-      });
-    }
-
-    if (userType !== 'admin' && professional.user_id !== userId) {
-      return res.status(403).json({
-        error: 'Você não tem permissão'
-      });
-    }
-
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({
-        error: 'Nenhuma imagem foi enviada'
-      });
-    }
-
-    const project = await db.PortfolioItem.findOne({
-      where: {
-        id: projectId,
-        professional_id: id
-      }
-    });
-
-    if (!project) {
-      return res.status(404).json({
-        error: 'Projeto não encontrado'
-      });
-    }
-
-    const currentImages = project.images || [];
-
-    if (currentImages.length + req.files.length > 3) {
-      return res.status(400).json({
-        error: 'Cada projeto pode ter no máximo 3 imagens'
-      });
-    }
-
-    const uploadedImages = req.files.map(file => ({
-      url: file.path,
-      public_id: file.filename
-    }));
-
-    const updatedImages = [...currentImages, ...uploadedImages];
-
-    await project.update({
-      images: updatedImages
-    });
-
-    console.log(`✅ ${uploadedImages.length} imagens adicionadas ao projeto ${projectId}`);
-
-    res.json({
-      success: true,
-      message: 'Imagens adicionadas com sucesso',
-      data: {
-        project,
-        uploadedCount: uploadedImages.length
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Erro ao fazer upload:', error);
-    res.status(500).json({
-      error: 'Erro ao fazer upload das imagens',
-      details: error.message
-    });
-  }
-};
-
-// ✏️ ATUALIZAR PROJETO
-export const updatePortfolioProject = async (req, res) => {
-  try {
-    const { id, projectId } = req.params;
-    const userId = req.user.id;
-    const userType = req.user.user_type;
-    const { title, description, project_type, area, duration } = req.body;
-
-    const professional = await db.Professional.findByPk(id, {
-      include: [{
-        model: db.User,
-        as: 'user',
-        required: false
-      }]
-    });
-
-    if (!professional) {
-      return res.status(404).json({
-        error: 'Profissional não encontrado'
-      });
-    }
-
-    if (userType !== 'admin' && professional.user_id !== userId) {
-      return res.status(403).json({
-        error: 'Você não tem permissão'
-      });
-    }
-
-    const project = await db.PortfolioItem.findOne({
-      where: {
-        id: projectId,
-        professional_id: id
-      }
-    });
-
-    if (!project) {
-      return res.status(404).json({
-        error: 'Projeto não encontrado'
-      });
-    }
-
-    await project.update({
+    const {
       title,
       description,
       project_type,
       area,
-      duration
-    });
+      duration,
+      completed_at,
+      tags,
+      images
+    } = req.body;
 
-    console.log('✅ Projeto atualizado:', projectId);
+    console.log('➕ Criando portfolio para profissional:', id);
+    console.log('📋 Dados recebidos:', { title, images: images?.length });
 
-    res.json({
-      success: true,
-      message: 'Projeto atualizado com sucesso',
-      data: project
-    });
-
-  } catch (error) {
-    console.error('❌ Erro ao atualizar projeto:', error);
-    res.status(500).json({
-      error: 'Erro ao atualizar projeto',
-      details: error.message
-    });
-  }
-};
-
-// 🗑️ DELETAR PROJETO COMPLETO
-export const deletePortfolioProject = async (req, res) => {
-  try {
-    const { id, projectId } = req.params;
-    const userId = req.user.id;
-    const userType = req.user.user_type;
-
-    const professional = await db.Professional.findByPk(id, {
-      include: [{
-        model: db.User,
-        as: 'user',
-        required: false
-      }]
-    });
-
-    if (!professional) {
-      return res.status(404).json({
-        error: 'Profissional não encontrado'
-      });
-    }
-
-    if (userType !== 'admin' && professional.user_id !== userId) {
-      return res.status(403).json({
-        error: 'Você não tem permissão'
-      });
-    }
-
-    const project = await db.PortfolioItem.findOne({
-      where: {
-        id: projectId,
-        professional_id: id
-      }
-    });
-
-    if (!project) {
-      return res.status(404).json({
-        error: 'Projeto não encontrado'
-      });
-    }
-
-    const images = project.images || [];
-    for (const image of images) {
-      if (image.public_id) {
-        await deleteImage(image.public_id);
-      } else if (image.url) {
-        const publicId = getPublicIdFromUrl(image.url);
-        if (publicId) {
-          await deleteImage(publicId);
-        }
-      }
-    }
-
-    await project.destroy();
-
-    console.log('✅ Projeto deletado:', projectId);
-
-    res.json({
-      success: true,
-      message: 'Projeto removido com sucesso'
-    });
-
-  } catch (error) {
-    console.error('❌ Erro ao deletar projeto:', error);
-    res.status(500).json({
-      error: 'Erro ao remover projeto',
-      details: error.message
-    });
-  }
-};
-
-// 🗑️ DELETAR IMAGEM ESPECÍFICA DE UM PROJETO
-export const deleteProjectImage = async (req, res) => {
-  try {
-    const { id, projectId, imageIndex } = req.params;
-    const userId = req.user.id;
-    const userType = req.user.user_type;
-
-    const professional = await db.Professional.findByPk(id, {
-      include: [{
-        model: db.User,
-        as: 'user',
-        required: false
-      }]
-    });
-
-    if (!professional) {
-      return res.status(404).json({
-        error: 'Profissional não encontrado'
-      });
-    }
-
-    if (userType !== 'admin' && professional.user_id !== userId) {
-      return res.status(403).json({
-        error: 'Você não tem permissão'
-      });
-    }
-
-    const project = await db.PortfolioItem.findOne({
-      where: {
-        id: projectId,
-        professional_id: id
-      }
-    });
-
-    if (!project) {
-      return res.status(404).json({
-        error: 'Projeto não encontrado'
-      });
-    }
-
-    const currentImages = project.images || [];
-    const index = parseInt(imageIndex);
-
-    if (index < 0 || index >= currentImages.length) {
-      return res.status(400).json({
-        error: 'Índice de imagem inválido'
-      });
-    }
-
-    const imageToDelete = currentImages[index];
-
-    if (imageToDelete.public_id) {
-      await deleteImage(imageToDelete.public_id);
-    } else if (imageToDelete.url) {
-      const publicId = getPublicIdFromUrl(imageToDelete.url);
-      if (publicId) {
-        await deleteImage(publicId);
-      }
-    }
-
-    const updatedImages = currentImages.filter((_, i) => i !== index);
-
-    await project.update({
-      images: updatedImages
-    });
-
-    console.log('✅ Imagem removida do projeto');
-
-    res.json({
-      success: true,
-      message: 'Imagem removida com sucesso',
-      data: {
-        project
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Erro ao deletar imagem:', error);
-    res.status(500).json({
-      error: 'Erro ao deletar imagem',
-      details: error.message
-    });
-  }
-};
-
-// ➕ Adicionar item ao portfolio (COMPATIBILIDADE - DEPRECATED)
-export const addPortfolioItem = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { title, description, images } = req.body;
-
-    const professional = await db.Professional.findByPk(id);
-    if (!professional) {
-      return res.status(404).json({
-        error: 'Profissional não encontrado'
-      });
-    }
+    // ✅ GERAR ID MANUALMENTE
+    const portfolioId = `port-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const portfolioItem = await db.PortfolioItem.create({
+      id: portfolioId, // ✅ ID EXPLÍCITO
       professional_id: id,
-      title,
-      description,
+      title: title || 'Sem título',
+      description: description || '',
+      project_type: project_type || null,
+      area: area || null,
+      duration: duration || null,
+      completed_at: completed_at || null,
+      tags: tags || [],
       images: images || []
     });
 
-    res.status(201).json({
-      success: true,
-      data: portfolioItem
-    });
-
-  } catch (error) {
-    console.error('Erro ao adicionar item ao portfolio:', error);
-    res.status(500).json({
-      error: 'Erro ao adicionar item',
-      details: error.message
-    });
-  }
-};
-
-// ✏️ Atualizar item do portfolio (COMPATIBILIDADE - DEPRECATED)
-export const updatePortfolioItem = async (req, res) => {
-  try {
-    const { professionalId, itemId } = req.params;
-    const { title, description, images } = req.body;
-
-    const portfolioItem = await db.PortfolioItem.findOne({
-      where: {
-        id: itemId,
-        professional_id: professionalId
-      }
-    });
-
-    if (!portfolioItem) {
-      return res.status(404).json({
-        error: 'Item do portfolio não encontrado'
-      });
-    }
-
-    await portfolioItem.update({
-      title,
-      description,
-      images
-    });
+    console.log('✅ Portfolio criado com sucesso:', portfolioItem.id);
 
     res.json({
       success: true,
+      message: 'Item adicionado ao portfolio',
       data: portfolioItem
     });
 
   } catch (error) {
-    console.error('Erro ao atualizar item do portfolio:', error);
+    console.error('❌ Erro ao adicionar item ao portfolio:', error);
+    console.error('Stack:', error.stack);
     res.status(500).json({
-      error: 'Erro ao atualizar item',
-      details: error.message
+      success: false,
+      error: 'Erro ao adicionar item ao portfolio',
+      message: error.message
     });
   }
 };
 
-// 🗑️ Remover item do portfolio (COMPATIBILIDADE - DEPRECATED)
-export const deletePortfolioItem = async (req, res) => {
+// ✏️ ATUALIZAR ITEM DO PORTFOLIO
+export const updatePortfolioItem = async (req, res) => {
   try {
-    const { professionalId, itemId } = req.params;
+    const { itemId } = req.params;
+    const updateData = req.body;
 
-    const portfolioItem = await db.PortfolioItem.findOne({
-      where: {
-        id: itemId,
-        professional_id: professionalId
-      }
-    });
+    const portfolioItem = await db.PortfolioItem.findByPk(itemId);
 
     if (!portfolioItem) {
       return res.status(404).json({
-        error: 'Item do portfolio não encontrado'
+        success: false,
+        error: 'Item não encontrado'
       });
     }
 
-    const images = portfolioItem.images || [];
-    for (const image of images) {
-      if (image.public_id) {
-        await deleteImage(image.public_id);
-      } else if (image.url) {
-        const publicId = getPublicIdFromUrl(image.url);
-        if (publicId) {
-          await deleteImage(publicId);
-        }
-      }
+    await portfolioItem.update(updateData);
+
+    res.json({
+      success: true,
+      message: 'Item atualizado com sucesso',
+      data: portfolioItem
+    });
+
+  } catch (error) {
+    console.error('Erro ao atualizar item:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao atualizar item',
+      message: error.message
+    });
+  }
+};
+
+// 🗑️ DELETAR ITEM DO PORTFOLIO
+export const deletePortfolioItem = async (req, res) => {
+  try {
+    const { itemId } = req.params;
+
+    const portfolioItem = await db.PortfolioItem.findByPk(itemId);
+
+    if (!portfolioItem) {
+      return res.status(404).json({
+        success: false,
+        error: 'Item não encontrado'
+      });
     }
 
     await portfolioItem.destroy();
@@ -926,178 +445,137 @@ export const deletePortfolioItem = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erro ao remover item do portfolio:', error);
+    console.error('Erro ao deletar item:', error);
     res.status(500).json({
-      error: 'Erro ao remover item',
-      details: error.message
+      success: false,
+      error: 'Erro ao deletar item',
+      message: error.message
     });
   }
 };
 
-// 📤 UPLOAD de imagens do portfolio (DEPRECATED - usar createPortfolioProject + uploadProjectImages)
+// 📤 UPLOAD DE IMAGENS DO PORTFOLIO
 export const uploadPortfolioImages = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
-    const userType = req.user.user_type;
-
-    const professional = await db.Professional.findByPk(id, {
-      include: [{
-        model: db.User,
-        as: 'user',
-        required: false
-      }]
-    });
-
-    if (!professional) {
-      return res.status(404).json({
-        error: 'Profissional não encontrado'
-      });
-    }
-
-    if (userType !== 'admin' && professional.user_id !== userId) {
-      return res.status(403).json({
-        error: 'Você não tem permissão para adicionar imagens'
-      });
-    }
 
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
-        error: 'Nenhuma imagem foi enviada'
+        success: false,
+        error: 'Nenhum arquivo enviado'
       });
     }
 
-    const uploadedImages = req.files.map(file => ({
-      url: file.path,
-      public_id: file.filename
-    }));
-
-    console.log(`📤 ${uploadedImages.length} imagens enviadas para o Cloudinary`);
-
-    let portfolioItem = await db.PortfolioItem.findOne({
-      where: { professional_id: id }
-    });
-
-    if (!portfolioItem) {
-      portfolioItem = await db.PortfolioItem.create({
-        professional_id: id,
-        title: 'Meu Portfolio',
-        description: '',
-        images: uploadedImages
-      });
-      console.log('✅ Novo portfolio criado');
-    } else {
-      const currentImages = portfolioItem.images || [];
-      const updatedImages = [...currentImages, ...uploadedImages];
-      
-      await portfolioItem.update({
-        images: updatedImages
-      });
-      console.log('✅ Imagens adicionadas ao portfolio existente');
-    }
+    // As URLs já vêm do multer/cloudinary configurado
+    const imageUrls = req.files.map(file => file.path);
 
     res.json({
       success: true,
-      message: 'Imagens adicionadas com sucesso',
+      message: `${imageUrls.length} imagem(ns) enviada(s) com sucesso`,
       data: {
-        portfolio: portfolioItem,
-        uploadedCount: uploadedImages.length
+        images: imageUrls,
+        uploadedCount: imageUrls.length
       }
     });
 
   } catch (error) {
-    console.error('❌ Erro ao fazer upload de imagens:', error);
+    console.error('Erro no upload de imagens:', error);
     res.status(500).json({
+      success: false,
       error: 'Erro ao fazer upload das imagens',
-      details: error.message
+      message: error.message
     });
   }
 };
 
-// 🗑️ DELETAR imagem específica do portfolio (DEPRECATED)
+// 🗑️ DELETAR IMAGEM DO PORTFOLIO
 export const deletePortfolioImage = async (req, res) => {
   try {
     const { id, imageIndex } = req.params;
-    const userId = req.user.id;
-    const userType = req.user.user_type;
 
-    const professional = await db.Professional.findByPk(id, {
-      include: [{
-        model: db.User,
-        as: 'user',
-        required: false
-      }]
-    });
+    const professional = await db.Professional.findByPk(id);
 
-    if (!professional) {
+    if (!professional || !professional.portfolio_images) {
       return res.status(404).json({
-        error: 'Profissional não encontrado'
-      });
-    }
-
-    if (userType !== 'admin' && professional.user_id !== userId) {
-      return res.status(403).json({
-        error: 'Você não tem permissão para remover imagens'
-      });
-    }
-
-    const portfolioItem = await db.PortfolioItem.findOne({
-      where: { professional_id: id }
-    });
-
-    if (!portfolioItem) {
-      return res.status(404).json({
+        success: false,
         error: 'Portfolio não encontrado'
       });
     }
 
-    const currentImages = portfolioItem.images || [];
+    const images = [...professional.portfolio_images];
     const index = parseInt(imageIndex);
 
-    if (index < 0 || index >= currentImages.length) {
+    if (index < 0 || index >= images.length) {
       return res.status(400).json({
+        success: false,
         error: 'Índice de imagem inválido'
       });
     }
 
-    const imageToDelete = currentImages[index];
-    
-    console.log('🗑️ Deletando imagem:', imageToDelete);
+    images.splice(index, 1);
 
-    if (imageToDelete.public_id) {
-      const deleted = await deleteImage(imageToDelete.public_id);
-      if (deleted) {
-        console.log('✅ Imagem deletada do Cloudinary');
-      }
-    } else if (imageToDelete.url) {
-      const publicId = getPublicIdFromUrl(imageToDelete.url);
-      if (publicId) {
-        await deleteImage(publicId);
-        console.log('✅ Imagem deletada do Cloudinary (extraída da URL)');
-      }
-    }
-
-    const updatedImages = currentImages.filter((_, i) => i !== index);
-
-    await portfolioItem.update({
-      images: updatedImages
-    });
-
-    console.log('✅ Portfolio atualizado no banco de dados');
+    await professional.update({ portfolio_images: images });
 
     res.json({
       success: true,
-      message: 'Imagem removida com sucesso',
+      message: 'Imagem removida com sucesso'
+    });
+
+  } catch (error) {
+    console.error('Erro ao deletar imagem:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao deletar imagem',
+      message: error.message
+    });
+  }
+};
+
+// 🤝 INDICAR PROFISSIONAL
+export const indicateProfessional = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const indicatorId = req.user.id;
+
+    // Lógica de indicação aqui
+
+    res.json({
+      success: true,
+      message: 'Profissional indicado com sucesso'
+    });
+
+  } catch (error) {
+    console.error('Erro ao indicar profissional:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao indicar profissional',
+      message: error.message
+    });
+  }
+};
+
+// 📊 ESTATÍSTICAS DO PROFISSIONAL
+export const getProfessionalStats = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const portfolioCount = await db.PortfolioItem.count({
+      where: { professional_id: id }
+    });
+
+    res.json({
+      success: true,
       data: {
-        portfolio: portfolioItem
+        portfolioItems: portfolioCount
       }
     });
 
   } catch (error) {
-    console.error('❌ Erro ao deletar imagem:', error);
+    console.error('Erro ao buscar estatísticas:', error);
     res.status(500).json({
-      error: 'Erro ao deletar imagem',
-      details: error.message
+      success: false,
+      error: 'Erro ao buscar estatísticas',
+      message: error.message
     });
   }
 };

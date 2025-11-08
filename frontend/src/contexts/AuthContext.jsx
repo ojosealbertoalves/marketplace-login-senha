@@ -1,4 +1,4 @@
-// frontend/src/contexts/AuthContext.jsx - COM SUPORTE A CLIENT
+// frontend/src/contexts/AuthContext.jsx - COM REFRESH USER
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
@@ -121,6 +121,66 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // ✅ NOVA FUNÇÃO: Recarregar dados do usuário e do profissional
+  const refreshUser = async () => {
+    try {
+      if (!token) return { success: false, error: 'Não autenticado' };
+
+      console.log('🔄 Recarregando dados do usuário...');
+      
+      // Buscar dados do usuário
+      const userResponse = await fetch('http://localhost:3001/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!userResponse.ok) {
+        console.log('⚠️ Endpoint /auth/me não existe, tentando /professionals/me...');
+        
+        // Se não existir /auth/me, buscar do profissional
+        const profResponse = await fetch('http://localhost:3001/api/professionals/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        const profData = await profResponse.json();
+
+        if (!profResponse.ok) {
+          return { success: false, error: profData.error || 'Erro ao recarregar dados' };
+        }
+
+        // Atualizar foto do usuário com a foto do profissional
+        const updatedUser = {
+          ...user,
+          profile_photo: profData.data.profile_photo
+        };
+
+        console.log('✅ Dados recarregados do profissional:', updatedUser);
+
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        
+        return { success: true, data: updatedUser };
+      }
+
+      const userData = await userResponse.json();
+
+      console.log('✅ Dados do usuário recarregados:', userData.user || userData.data);
+
+      const newUser = userData.user || userData.data;
+      setUser(newUser);
+      localStorage.setItem('user', JSON.stringify(newUser));
+      
+      return { success: true, data: newUser };
+
+    } catch (error) {
+      console.error('❌ Erro ao recarregar usuário:', error);
+      return { success: false, error: 'Erro de conexão' };
+    }
+  };
+
   // Verificar permissões
   const hasPermission = (permission) => {
     if (!user) return false;
@@ -148,7 +208,6 @@ export function AuthProvider({ children }) {
         'view_contact_info',
         'create_job_openings'
       ],
-      // ✨ PERMISSÕES DO CLIENTE
       'client': [
         'view_professionals',
         'view_contact_info',
@@ -197,11 +256,12 @@ export function AuthProvider({ children }) {
     isAdmin: user?.user_type === 'admin',
     isProfessional: user?.user_type === 'professional',
     isCompany: user?.user_type === 'company',
-    isClient: user?.user_type === 'client', // ✨ NOVO
+    isClient: user?.user_type === 'client',
     login,
     register,
     logout,
     updateProfile,
+    refreshUser, // ✅ NOVA FUNÇÃO
     hasPermission,
     getAuthHeaders,
     authFetch

@@ -9,7 +9,7 @@ import adminRoutes from './adminRoutes.js';
 import cityRoutes from './cityRoutes.js';
 import authRoutes from './auth.js';
 import profileRoutes from './profile.js';
-import uploadRoutes from './uploadRoutes.js'; // ← APENAS ESTA LINHA (sem duplicação)
+import uploadRoutes from './upload.js'; // ✅ CORRIGIDO AQUI
 
 const router = express.Router();
 
@@ -36,10 +36,10 @@ router.get('/test', (req, res) => {
   });
 });
 
-// Usar as rotas (SEM DUPLICAÇÃO)
+// Usar as rotas
 router.use('/auth', authRoutes);
 router.use('/profile', profileRoutes);
-router.use('/upload', uploadRoutes); // ← APENAS UMA VEZ
+router.use('/upload', uploadRoutes); // ✅ Agora vai funcionar
 router.use('/categories', categoryRoutes);
 router.use('/professionals', professionalRoutes);
 router.use('/users', userRoutes);

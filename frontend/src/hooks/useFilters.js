@@ -1,4 +1,4 @@
-// frontend/src/hooks/useFilters.js - CORRIGIDO
+// frontend/src/hooks/useFilters.js - CORRIGIDO DEFINITIVO
 import { useState, useMemo } from 'react';
 
 export const useFilters = (professionals = [], categories = []) => {
@@ -53,7 +53,13 @@ export const useFilters = (professionals = [], categories = []) => {
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         const matchesName = professional.name?.toLowerCase().includes(searchLower);
-        const matchesCategory = professional.category?.toLowerCase().includes(searchLower);
+        
+        // ✅ CORRIGIDO: category pode ser objeto ou string
+        const categoryName = typeof professional.category === 'object' 
+          ? professional.category?.name 
+          : professional.category;
+        const matchesCategory = categoryName?.toLowerCase().includes(searchLower);
+        
         const matchesDescription = professional.description?.toLowerCase().includes(searchLower);
         
         if (!matchesName && !matchesCategory && !matchesDescription) {
@@ -61,21 +67,25 @@ export const useFilters = (professionals = [], categories = []) => {
         }
       }
 
-      // Filtro de categoria - CORRIGIDO PARA PEGAR PELO ID
+      // Filtro de categoria
       if (filters.category) {
         // Buscar categoria pelo ID selecionado
         const selectedCategory = safeCategories.find(cat => cat.id === filters.category);
         
         if (!selectedCategory) return false;
         
-        // Comparar usando categoryId OU nome da categoria
-        const matchesById = professional.categoryId === filters.category;
-        const matchesByName = professional.category === selectedCategory.name;
+        // ✅ CORRIGIDO: Comparar category_id OU nome da categoria
+        const matchesById = professional.category_id === filters.category;
+        
+        const categoryName = typeof professional.category === 'object'
+          ? professional.category?.name
+          : professional.category;
+        const matchesByName = categoryName === selectedCategory.name;
         
         if (!matchesById && !matchesByName) return false;
       }
 
-      // Filtro de subcategoria - CORRIGIDO
+      // Filtro de subcategoria
       if (filters.subcategory) {
         // Verificar se o professional tem essa subcategoria
         if (!professional.subcategories || !Array.isArray(professional.subcategories)) {

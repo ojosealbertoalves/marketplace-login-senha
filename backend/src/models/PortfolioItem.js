@@ -1,22 +1,14 @@
-// src/models/PortfolioItem.js
-import { Model } from 'sequelize';
+// backend/src/models/PortfolioItem.js - COM GERAÇÃO AUTOMÁTICA DE ID
+import { DataTypes } from 'sequelize';
 
-export default (sequelize, DataTypes) => {
-  class PortfolioItem extends Model {
-    static associate(models) {
-      // Um item de portfolio pertence a um profissional
-      PortfolioItem.belongsTo(models.Professional, {
-        foreignKey: 'professional_id',
-        as: 'professional'
-      });
-    }
-  }
-  
-  PortfolioItem.init({
+export default (sequelize) => {
+  const PortfolioItem = sequelize.define('PortfolioItem', {
     id: {
       type: DataTypes.STRING,
       primaryKey: true,
-      allowNull: false
+      allowNull: false,
+      // ✅ GERAÇÃO AUTOMÁTICA DE ID
+      defaultValue: () => `port-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     },
     professional_id: {
       type: DataTypes.STRING,
@@ -24,7 +16,8 @@ export default (sequelize, DataTypes) => {
       references: {
         model: 'professionals',
         key: 'id'
-      }
+      },
+      onDelete: 'CASCADE'
     },
     title: {
       type: DataTypes.STRING,
@@ -35,7 +28,7 @@ export default (sequelize, DataTypes) => {
       allowNull: true
     },
     images: {
-      type: DataTypes.JSON, // Array de URLs das imagens
+      type: DataTypes.JSON,
       allowNull: true,
       defaultValue: []
     },
@@ -59,14 +52,26 @@ export default (sequelize, DataTypes) => {
       type: DataTypes.JSON,
       allowNull: true,
       defaultValue: []
+    },
+    created_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+      field: 'created_at'
+    },
+    updated_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+      field: 'updated_at'
     }
   }, {
-    sequelize,
-    modelName: 'PortfolioItem',
     tableName: 'portfolio_items',
     timestamps: true,
-    underscored: true
+    underscored: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at'
   });
-  
+
   return PortfolioItem;
 };

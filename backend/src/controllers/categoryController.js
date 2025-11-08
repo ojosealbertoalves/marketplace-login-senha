@@ -1,5 +1,5 @@
 // backend/src/controllers/categoryController.js
-import sequelize from '../config/db.js';
+import sequelize from '../config/database.js';
 
 // 📋 Listar todas as categorias
 export const getAllCategories = async (req, res) => {

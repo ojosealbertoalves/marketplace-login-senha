@@ -1,144 +1,241 @@
-// backend/src/controllers/userController.js
-import sequelize from '../config/db.js';
+// backend/src/controllers/userController.js - VERSÃO SEQUELIZE
+import sequelize from '../config/database.js';
+import bcrypt from 'bcrypt';
 
-// Verificar se email existe (PRINCIPAL PARA O FRONTEND)
+// ✅ Verificar se email existe
 export const checkUserEmail = async (req, res) => {
   try {
     const { email } = req.query;
-    
+
     if (!email) {
-      return res.status(400).json({ 
-        error: 'Email é obrigatório',
-        exists: false 
+      return res.status(400).json({
+        success: false,
+        message: 'Email é obrigatório'
       });
     }
-    
-    const [users] = await sequelize.query(`
-      SELECT id 
-      FROM users 
-      WHERE LOWER(email) = LOWER(:email) AND is_active = true
-      LIMIT 1
-    `, {
-      replacements: { email }
+
+    const [results] = await sequelize.query(
+      'SELECT id, email, user_type FROM users WHERE LOWER(email) = LOWER(?)',
+      {
+        replacements: [email],
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    if (results) {
+      return res.json({
+        success: true,
+        exists: true,
+        user: results
+      });
+    }
+
+    res.json({
+      success: true,
+      exists: false
     });
-    
-    const userExists = users.length > 0;
-    
-    res.json({ 
-      exists: userExists,
-      message: userExists ? 'Usuário encontrado' : 'Usuário não encontrado'
-    });
-    
   } catch (error) {
-    console.error('Erro ao verificar usuário:', error);
-    res.status(500).json({ 
-      error: 'Erro ao verificar usuário',
-      exists: false 
+    console.error('❌ Erro ao verificar email:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao verificar email',
+      error: error.message
     });
   }
 };
 
-// Listar todos os usuários
+// 📋 Listar todos os usuários
 export const getAllUsers = async (req, res) => {
   try {
-    const [users] = await sequelize.query(`
-      SELECT 
-        id, name, email, city, state, 
-        created_at as "createdAt", 
-        updated_at as "updatedAt"
-      FROM users 
-      WHERE is_active = true
-      ORDER BY created_at DESC
-    `);
-    
-    res.json(users);
+    const results = await sequelize.query(
+      'SELECT id, email, user_type, created_at FROM users ORDER BY created_at DESC',
+      { type: sequelize.QueryTypes.SELECT }
+    );
+
+    res.json({
+      success: true,
+      data: results,
+      count: results.length
+    });
   } catch (error) {
-    console.error('Erro ao carregar usuários:', error);
-    res.status(500).json({ error: 'Erro ao carregar usuários' });
+    console.error('❌ Erro ao listar usuários:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao listar usuários',
+      error: error.message
+    });
   }
 };
 
-// Buscar usuário por ID
+// 🔍 Buscar usuário por ID
 export const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const [users] = await sequelize.query(`
-      SELECT 
-        id, name, email, city, state,
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-      FROM users 
-      WHERE id = :id AND is_active = true
-    `, {
-      replacements: { id }
-    });
-    
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    const results = await sequelize.query(
+      'SELECT id, email, user_type, professional_id, company_id, created_at FROM users WHERE id = ?',
+      {
+        replacements: [id],
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    if (results.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuário não encontrado'
+      });
     }
-    
-    res.json(users[0]);
-    
+
+    res.json({
+      success: true,
+      data: results[0]
+    });
   } catch (error) {
-    console.error('Erro ao buscar usuário:', error);
-    res.status(500).json({ error: 'Erro ao buscar usuário' });
+    console.error('❌ Erro ao buscar usuário:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar usuário',
+      error: error.message
+    });
   }
 };
 
-// Estatísticas básicas de usuários
+// ✏️ ATUALIZAR USUÁRIO
+export const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email, password, user_type } = req.body;
+
+    // Verificar se o usuário existe
+    const userCheck = await sequelize.query(
+      'SELECT * FROM users WHERE id = ?',
+      {
+        replacements: [id],
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    if (userCheck.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuário não encontrado'
+      });
+    }
+
+    // Verificar permissão (só o próprio usuário ou admin pode atualizar)
+    if (req.user.id !== id && req.user.user_type !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Sem permissão para atualizar este usuário'
+      });
+    }
+
+    // Construir query dinâmica
+    const updates = [];
+    const values = [];
+
+    if (email) {
+      // Verificar se o novo email já existe (em outro usuário)
+      const emailCheck = await sequelize.query(
+        'SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND id != ?',
+        {
+          replacements: [email, id],
+          type: sequelize.QueryTypes.SELECT
+        }
+      );
+
+      if (emailCheck.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Este email já está em uso'
+        });
+      }
+
+      updates.push('email = ?');
+      values.push(email);
+    }
+
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      updates.push('password = ?');
+      values.push(hashedPassword);
+    }
+
+    // user_type só pode ser alterado por admin
+    if (user_type && req.user.user_type === 'admin') {
+      updates.push('user_type = ?');
+      values.push(user_type);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nenhum campo para atualizar'
+      });
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    const query = `
+      UPDATE users 
+      SET ${updates.join(', ')}
+      WHERE id = ?
+    `;
+
+    await sequelize.query(query, {
+      replacements: values,
+      type: sequelize.QueryTypes.UPDATE
+    });
+
+    // Buscar o usuário atualizado
+    const result = await sequelize.query(
+      'SELECT id, email, user_type, professional_id, company_id, created_at, updated_at FROM users WHERE id = ?',
+      {
+        replacements: [id],
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Usuário atualizado com sucesso',
+      data: result[0]
+    });
+  } catch (error) {
+    console.error('❌ Erro ao atualizar usuário:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao atualizar usuário',
+      error: error.message
+    });
+  }
+};
+
+// 📊 Estatísticas de usuários
 export const getUserStats = async (req, res) => {
   try {
-    const [[totalUsers]] = await sequelize.query(
-      'SELECT COUNT(*) as count FROM users WHERE is_active = true'
-    );
-    
-    const [[totalInactive]] = await sequelize.query(
-      'SELECT COUNT(*) as count FROM users WHERE is_active = false'
-    );
-    
-    // Registros dos últimos 30 dias
-    const [[recentRegistrations]] = await sequelize.query(`
-      SELECT COUNT(*) as count 
-      FROM users 
-      WHERE is_active = true 
-      AND created_at > NOW() - INTERVAL '30 days'
-    `);
-    
-    // Última data de registro
-    const [lastReg] = await sequelize.query(`
-      SELECT created_at 
-      FROM users 
-      WHERE is_active = true 
-      ORDER BY created_at DESC 
-      LIMIT 1
-    `);
-    
-    // Usuários por cidade
-    const [byCity] = await sequelize.query(`
+    const result = await sequelize.query(`
       SELECT 
-        COALESCE(city, 'Não informado') as city, 
-        COUNT(*) as count
+        COUNT(*) as total_users,
+        COUNT(CASE WHEN user_type = 'professional' THEN 1 END) as professionals,
+        COUNT(CASE WHEN user_type = 'company' THEN 1 END) as companies,
+        COUNT(CASE WHEN user_type = 'admin' THEN 1 END) as admins,
+        COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as last_30_days
       FROM users
-      WHERE is_active = true
-      GROUP BY city
-    `);
-    
-    const stats = {
-      totalUsers: parseInt(totalUsers.count),
-      totalInactive: parseInt(totalInactive.count),
-      recentRegistrations: parseInt(recentRegistrations.count),
-      lastRegistration: lastReg[0]?.created_at || null,
-      usersByCity: byCity.reduce((acc, item) => {
-        acc[item.city] = parseInt(item.count);
-        return acc;
-      }, {})
-    };
-    
-    res.json(stats);
-    
+    `, { type: sequelize.QueryTypes.SELECT });
+
+    res.json({
+      success: true,
+      data: result[0]
+    });
   } catch (error) {
-    console.error('Erro ao buscar estatísticas:', error);
-    res.status(500).json({ error: 'Erro ao buscar estatísticas' });
+    console.error('❌ Erro ao buscar estatísticas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar estatísticas',
+      error: error.message
+    });
   }
 };

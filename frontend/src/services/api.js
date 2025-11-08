@@ -110,6 +110,7 @@ export const getProfessionals = async () => {
   }
 };
 
+
 export const getProfessionalById = async (id) => {
   try {
     const token = localStorage.getItem('token');
@@ -118,15 +119,38 @@ export const getProfessionalById = async (id) => {
       ...(token && { 'Authorization': `Bearer ${token}` })
     };
 
+    // Buscar dados do profissional
     const response = await fetch(`${API_BASE_URL}/professionals/${id}`, { headers });
     const data = await response.json();
     
-    return data.data;
+    if (!data.data) {
+      throw new Error('Profissional não encontrado');
+    }
+
+    const professional = data.data;
+
+    // Buscar portfolio do profissional
+    try {
+      const portfolioResponse = await fetch(`${API_BASE_URL}/professionals/${id}/portfolio`, { headers });
+      const portfolioData = await portfolioResponse.json();
+      
+      if (portfolioData.success && portfolioData.data) {
+        professional.portfolio = portfolioData.data;
+      } else {
+        professional.portfolio = [];
+      }
+    } catch (portfolioError) {
+      console.error('Erro ao buscar portfolio:', portfolioError);
+      professional.portfolio = [];
+    }
+    
+    return professional;
   } catch (error) {
     console.error('Erro ao buscar profissional:', error);
     throw error;
   }
 };
+
 
 export const getCategories = async () => {
   try {
