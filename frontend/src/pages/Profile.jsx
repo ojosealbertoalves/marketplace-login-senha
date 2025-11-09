@@ -1,4 +1,4 @@
-// frontend/src/pages/Profile.jsx - VERSÃO COMPLETA COM PORTFOLIO
+// frontend/src/pages/Profile.jsx - VERSÃO COMPLETA COM EDIÇÃO DE IMAGENS
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -311,7 +311,9 @@ const Profile = () => {
         completed_at: item.completed_at ? item.completed_at.split('T')[0] : '',
         tags: item.tags || []
       });
+      // ✅ Carregar imagens existentes ao editar
       setPortfolioImagePreviews(item.images || []);
+      setPortfolioImages([]); // Limpar arquivos novos
     } else {
       setEditingPortfolio(null);
       setPortfolioForm({
@@ -367,9 +369,10 @@ const Profile = () => {
     
     if (files.length === 0) return;
 
+    // ✅ Contar imagens existentes + novas
     const totalImages = portfolioImagePreviews.length + files.length;
     if (totalImages > 5) {
-      setError('Você pode ter no máximo 5 imagens por projeto');
+      setError(`Você pode ter no máximo 5 imagens. Você já tem ${portfolioImagePreviews.length} imagem(ns).`);
       return;
     }
 
@@ -395,8 +398,27 @@ const Profile = () => {
   };
 
   const removePortfolioImagePreview = (index) => {
-    setPortfolioImages(prev => prev.filter((_, i) => i !== index));
+    // Remove da lista de previews
     setPortfolioImagePreviews(prev => prev.filter((_, i) => i !== index));
+    
+    // ✅ Se estiver editando, precisamos saber se é uma imagem existente ou nova
+    if (editingPortfolio) {
+      // Verificar se o índice é de uma imagem existente (URL) ou nova (base64)
+      const imageToRemove = portfolioImagePreviews[index];
+      
+      // Se for base64 (nova imagem), remover do array de arquivos
+      if (imageToRemove && imageToRemove.startsWith('data:')) {
+        // É uma imagem nova - remover do array de files
+        const newImageIndex = portfolioImagePreviews
+          .slice(0, index)
+          .filter(img => img.startsWith('data:')).length;
+        
+        setPortfolioImages(prev => prev.filter((_, i) => i !== newImageIndex));
+      }
+    } else {
+      // Se estiver criando, apenas remover do array de arquivos
+      setPortfolioImages(prev => prev.filter((_, i) => i !== index));
+    }
   };
 
   const handlePortfolioSubmit = async (e) => {
@@ -407,10 +429,59 @@ const Profile = () => {
       setError('');
 
       if (editingPortfolio) {
-        // Atualizar projeto existente
+        // ===== MODO EDIÇÃO =====
+        
+        let finalImages = [...portfolioImagePreviews];
+        
+        // Se houver novas imagens para fazer upload
+        if (portfolioImages.length > 0) {
+          const formDataUpload = new FormData();
+          portfolioImages.forEach(file => {
+            formDataUpload.append('photos', file);
+          });
+
+          try {
+            console.log('📤 Enviando', portfolioImages.length, 'novas imagens...');
+            
+            const uploadResponse = await api.post(
+              '/upload/portfolio-photos',
+              formDataUpload,
+              {
+                headers: { 'Content-Type': 'multipart/form-data' }
+              }
+            );
+
+            if (uploadResponse.data.success && uploadResponse.data.photoUrls) {
+              // Substituir base64 pelas URLs reais
+              const newUrls = uploadResponse.data.photoUrls;
+              finalImages = finalImages.map(img => 
+                img.startsWith('data:') ? newUrls.shift() || img : img
+              );
+              
+              // Adicionar URLs restantes
+              if (newUrls.length > 0) {
+                finalImages.push(...newUrls);
+              }
+            }
+          } catch (uploadError) {
+            console.error('❌ Erro no upload:', uploadError);
+            setError(uploadError.response?.data?.error || 'Erro ao fazer upload das imagens');
+            setUploadingPortfolio(false);
+            return;
+          }
+        }
+
+        // Atualizar projeto com imagens finais
+        const projectData = {
+          ...portfolioForm,
+          images: finalImages.filter(img => !img.startsWith('data:')) // Remover base64 restantes
+        };
+
+        console.log('💾 Atualizando projeto:', projectData);
+
         const response = await api.put(
           `/professionals/${professionalId}/portfolio/${editingPortfolio.id}`,
-          portfolioForm
+          projectData
         );
 
         if (response.data.success) {
@@ -418,8 +489,10 @@ const Profile = () => {
           await loadPortfolio(professionalId);
           closePortfolioModal();
         }
+        
       } else {
-        // Criar novo projeto
+        // ===== MODO CRIAÇÃO =====
+        
         let imageUrls = [];
         
         // Fazer upload das imagens se houver
@@ -987,42 +1060,48 @@ const Profile = () => {
                 />
               </div>
 
-              {!editingPortfolio && (
-                <div className="form-group">
-                  <label htmlFor="portfolio-images">Imagens do Projeto (máx. 5)</label>
-                  <input
-                    type="file"
-                    id="portfolio-images"
-                    accept="image/*"
-                    multiple
-                    onChange={handlePortfolioImagesChange}
-                    style={{ display: 'none' }}
-                  />
-                  <label htmlFor="portfolio-images" className="btn btn-secondary btn-block">
-                    📁 Escolher Imagens
-                  </label>
-                  
-                  {portfolioImagePreviews.length > 0 && (
-                    <div className="image-previews">
-                      {portfolioImagePreviews.map((preview, index) => (
-                        <div key={index} className="image-preview-item">
-                          <img src={preview} alt={`Preview ${index + 1}`} />
-                          <button
-                            type="button"
-                            onClick={() => removePortfolioImagePreview(index)}
-                            className="remove-preview"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <p className="help-text">
-                    {portfolioImagePreviews.length} / 5 imagens selecionadas | Máx: 5MB cada
-                  </p>
-                </div>
-              )}
+              {/* ✅ IMAGENS - MOSTRAR TANTO NA CRIAÇÃO QUANTO NA EDIÇÃO */}
+              <div className="form-group">
+                <label htmlFor="portfolio-images">
+                  {editingPortfolio ? 'Gerenciar Imagens do Projeto (máx. 5)' : 'Imagens do Projeto (máx. 5)'}
+                </label>
+                
+                <input
+                  type="file"
+                  id="portfolio-images"
+                  accept="image/*"
+                  multiple
+                  onChange={handlePortfolioImagesChange}
+                  style={{ display: 'none' }}
+                />
+                
+                <label htmlFor="portfolio-images" className="btn btn-secondary btn-block">
+                  📁 {editingPortfolio ? 'Adicionar Mais Imagens' : 'Escolher Imagens'}
+                </label>
+                
+                {portfolioImagePreviews.length > 0 && (
+                  <div className="image-previews">
+                    {portfolioImagePreviews.map((preview, index) => (
+                      <div key={index} className="image-preview-item">
+                        <img src={preview} alt={`Preview ${index + 1}`} />
+                        <button
+                          type="button"
+                          onClick={() => removePortfolioImagePreview(index)}
+                          className="remove-preview"
+                          title="Remover imagem"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <p className="help-text">
+                  {portfolioImagePreviews.length} / 5 imagens | Máx: 5MB cada
+                  {editingPortfolio && ' | Clique no × para remover imagens'}
+                </p>
+              </div>
 
               <div className="modal-actions">
                 <button

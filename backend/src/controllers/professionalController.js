@@ -389,12 +389,14 @@ export const addPortfolioItem = async (req, res) => {
     });
   }
 };
-
 // ✏️ ATUALIZAR ITEM DO PORTFOLIO
 export const updatePortfolioItem = async (req, res) => {
   try {
     const { itemId } = req.params;
     const updateData = req.body;
+
+    console.log('✏️ Atualizando portfolio item:', itemId);
+    console.log('📋 Dados recebidos:', updateData);
 
     const portfolioItem = await db.PortfolioItem.findByPk(itemId);
 
@@ -405,7 +407,14 @@ export const updatePortfolioItem = async (req, res) => {
       });
     }
 
+    // ✅ Se vier um array de imagens, atualizar
+    if (updateData.images && Array.isArray(updateData.images)) {
+      console.log('📸 Atualizando imagens:', updateData.images.length);
+    }
+
     await portfolioItem.update(updateData);
+
+    console.log('✅ Portfolio atualizado com sucesso');
 
     res.json({
       success: true,
@@ -414,7 +423,7 @@ export const updatePortfolioItem = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erro ao atualizar item:', error);
+    console.error('❌ Erro ao atualizar item:', error);
     res.status(500).json({
       success: false,
       error: 'Erro ao atualizar item',
