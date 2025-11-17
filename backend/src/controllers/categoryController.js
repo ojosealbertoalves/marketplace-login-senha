@@ -26,10 +26,9 @@ export const getAllCategories = async (req, res) => {
       ORDER BY c.name
     `);
     
-    // Formatar para o frontend (compatível com estrutura anterior)
     const formattedCategories = categories.map(category => ({
       id: category.id,
-      name: category.name.replace(/^[^\w\s]+\s/, ''), // Remove emoji do início
+      name: category.name.replace(/^[^\w\s]+\s/, ''),
       nameWithIcon: category.name,
       slug: category.slug,
       icon: category.icon,
@@ -67,7 +66,7 @@ export const getCategoryById = async (req, res) => {
         ) as subcategories
       FROM categories c
       LEFT JOIN subcategories s ON c.id = s.category_id
-      WHERE c.id = :id
+      WHERE c.id = :id OR c.slug = :id
       GROUP BY c.id, c.name, c.slug, c.icon
     `, {
       replacements: { id }
@@ -95,11 +94,15 @@ export const getCategoryById = async (req, res) => {
   }
 };
 
-// 🔍 Buscar subcategorias por categoria
+// 🔍 Buscar subcategorias por categoria - ✅ CORRIGIDO PARA USAR O ID
 export const getSubcategoriesByCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
     
+    console.log('🔍 Buscando subcategorias para category_id:', categoryId);
+    
+    // ✅ Buscar subcategorias diretamente usando o categoryId
+    // O categoryId já vem correto (ex: cat-obras-reformas)
     const [subcategories] = await sequelize.query(`
       SELECT id, name, slug 
       FROM subcategories 
@@ -109,11 +112,20 @@ export const getSubcategoriesByCategory = async (req, res) => {
       replacements: { categoryId }
     });
     
-    res.json(subcategories);
+    console.log(`✅ Encontradas ${subcategories.length} subcategorias para ${categoryId}`);
+    
+    res.json({
+      success: true,
+      data: subcategories
+    });
     
   } catch (error) {
-    console.error('Erro ao buscar subcategorias:', error);
-    res.status(500).json({ error: 'Erro ao buscar subcategorias' });
+    console.error('❌ Erro ao buscar subcategorias:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Erro ao buscar subcategorias',
+      message: error.message 
+    });
   }
 };
 
@@ -127,10 +139,11 @@ export const getCategoryStats = async (req, res) => {
       SELECT 
         c.id,
         c.name,
+        c.slug,
         COUNT(s.id) as subcategories_count
       FROM categories c
       LEFT JOIN subcategories s ON c.id = s.category_id
-      GROUP BY c.id, c.name
+      GROUP BY c.id, c.name, c.slug
       ORDER BY c.name
     `);
     
@@ -140,6 +153,7 @@ export const getCategoryStats = async (req, res) => {
       categoryBreakdown: breakdown.map(cat => ({
         id: cat.id,
         name: cat.name.replace(/^[^\w\s]+\s/, ''),
+        slug: cat.slug,
         subcategoriesCount: parseInt(cat.subcategories_count)
       }))
     };
@@ -184,7 +198,7 @@ export const searchCategories = async (req, res) => {
       WHERE LOWER(c.name) LIKE :searchTerm
          OR EXISTS (
            SELECT 1 FROM subcategories s2 
-           WHERE s2.category_id = c.id 
+           WHERE s2.category_id = c.id
            AND LOWER(s2.name) LIKE :searchTerm
          )
       GROUP BY c.id, c.name, c.slug, c.icon

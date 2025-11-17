@@ -1,4 +1,4 @@
-// frontend/src/pages/Profile.jsx - VERSÃO COMPLETA COM EDIÇÃO DE IMAGENS
+// frontend/src/pages/Profile.jsx - VERSÃO COM REDES SOCIAIS
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -24,7 +24,13 @@ const Profile = () => {
     business_address: '',
     google_maps_link: '',
     category_id: '',
-    subcategories: []
+    subcategories: [],
+    social_media: {
+      instagram: '',
+      linkedin: '',
+      youtube: '',
+      website: ''
+    }
   });
 
   // Estados de foto de perfil
@@ -68,6 +74,8 @@ const Profile = () => {
   useEffect(() => {
     if (formData.category_id) {
       loadSubcategories(formData.category_id);
+    } else {
+      setSubcategories([]);
     }
   }, [formData.category_id]);
 
@@ -91,6 +99,26 @@ const Profile = () => {
           typeof sub === 'object' ? sub.id : sub
         );
       }
+
+      // Normalizar redes sociais
+      let socialMedia = {
+        instagram: '',
+        linkedin: '',
+        youtube: '',
+        website: ''
+      };
+
+      if (professional.social_media) {
+        if (typeof professional.social_media === 'string') {
+          try {
+            socialMedia = { ...socialMedia, ...JSON.parse(professional.social_media) };
+          } catch (e) {
+            console.error('Erro ao parsear social_media:', e);
+          }
+        } else if (typeof professional.social_media === 'object') {
+          socialMedia = { ...socialMedia, ...professional.social_media };
+        }
+      }
       
       setFormData({
         name: professional.name || '',
@@ -105,7 +133,8 @@ const Profile = () => {
         business_address: professional.business_address || '',
         google_maps_link: professional.google_maps_link || '',
         category_id: professional.category_id || '',
-        subcategories: subcategoriesIds
+        subcategories: subcategoriesIds,
+        social_media: socialMedia
       });
 
       if (professional.profile_photo) {
@@ -129,7 +158,6 @@ const Profile = () => {
       
       const categoriesData = Array.isArray(response.data) ? response.data : (response.data.data || []);
       
-      console.log('Categorias carregadas:', categoriesData.length);
       setCategories(categoriesData);
     } catch (err) {
       console.error('Erro ao carregar categorias:', err);
@@ -143,7 +171,10 @@ const Profile = () => {
     try {
       setLoadingCategories(true);
       const response = await api.get(`/categories/${categoryId}/subcategories`);
-      setSubcategories(response.data.data || []);
+      
+      const subcategoriesData = response.data.data || response.data || [];
+      
+      setSubcategories(subcategoriesData);
     } catch (err) {
       console.error('Erro ao carregar subcategorias:', err);
       setSubcategories([]);
@@ -174,12 +205,29 @@ const Profile = () => {
     }));
   };
 
-  const handleSubcategoryChange = (e) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+  const handleSocialMediaChange = (e) => {
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      subcategories: selectedOptions
+      social_media: {
+        ...prev.social_media,
+        [name]: value
+      }
     }));
+  };
+
+  const handleSubcategoryToggle = (subcategoryId) => {
+    setFormData(prev => {
+      const currentSubcategories = prev.subcategories || [];
+      const isSelected = currentSubcategories.includes(subcategoryId);
+      
+      return {
+        ...prev,
+        subcategories: isSelected
+          ? currentSubcategories.filter(id => id !== subcategoryId)
+          : [...currentSubcategories, subcategoryId]
+      };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -296,7 +344,7 @@ const Profile = () => {
   };
 
   // ========================================
-  // HANDLERS DE PORTFOLIO
+  // HANDLERS DE PORTFOLIO (mantidos iguais)
   // ========================================
 
   const openPortfolioModal = (item = null) => {
@@ -311,9 +359,8 @@ const Profile = () => {
         completed_at: item.completed_at ? item.completed_at.split('T')[0] : '',
         tags: item.tags || []
       });
-      // ✅ Carregar imagens existentes ao editar
       setPortfolioImagePreviews(item.images || []);
-      setPortfolioImages([]); // Limpar arquivos novos
+      setPortfolioImages([]);
     } else {
       setEditingPortfolio(null);
       setPortfolioForm({
@@ -369,7 +416,6 @@ const Profile = () => {
     
     if (files.length === 0) return;
 
-    // ✅ Contar imagens existentes + novas
     const totalImages = portfolioImagePreviews.length + files.length;
     if (totalImages > 5) {
       setError(`Você pode ter no máximo 5 imagens. Você já tem ${portfolioImagePreviews.length} imagem(ns).`);
@@ -398,17 +444,12 @@ const Profile = () => {
   };
 
   const removePortfolioImagePreview = (index) => {
-    // Remove da lista de previews
     setPortfolioImagePreviews(prev => prev.filter((_, i) => i !== index));
     
-    // ✅ Se estiver editando, precisamos saber se é uma imagem existente ou nova
     if (editingPortfolio) {
-      // Verificar se o índice é de uma imagem existente (URL) ou nova (base64)
       const imageToRemove = portfolioImagePreviews[index];
       
-      // Se for base64 (nova imagem), remover do array de arquivos
       if (imageToRemove && imageToRemove.startsWith('data:')) {
-        // É uma imagem nova - remover do array de files
         const newImageIndex = portfolioImagePreviews
           .slice(0, index)
           .filter(img => img.startsWith('data:')).length;
@@ -416,7 +457,6 @@ const Profile = () => {
         setPortfolioImages(prev => prev.filter((_, i) => i !== newImageIndex));
       }
     } else {
-      // Se estiver criando, apenas remover do array de arquivos
       setPortfolioImages(prev => prev.filter((_, i) => i !== index));
     }
   };
@@ -429,11 +469,8 @@ const Profile = () => {
       setError('');
 
       if (editingPortfolio) {
-        // ===== MODO EDIÇÃO =====
-        
         let finalImages = [...portfolioImagePreviews];
         
-        // Se houver novas imagens para fazer upload
         if (portfolioImages.length > 0) {
           const formDataUpload = new FormData();
           portfolioImages.forEach(file => {
@@ -441,8 +478,6 @@ const Profile = () => {
           });
 
           try {
-            console.log('📤 Enviando', portfolioImages.length, 'novas imagens...');
-            
             const uploadResponse = await api.post(
               '/upload/portfolio-photos',
               formDataUpload,
@@ -452,13 +487,11 @@ const Profile = () => {
             );
 
             if (uploadResponse.data.success && uploadResponse.data.photoUrls) {
-              // Substituir base64 pelas URLs reais
               const newUrls = uploadResponse.data.photoUrls;
               finalImages = finalImages.map(img => 
                 img.startsWith('data:') ? newUrls.shift() || img : img
               );
               
-              // Adicionar URLs restantes
               if (newUrls.length > 0) {
                 finalImages.push(...newUrls);
               }
@@ -471,13 +504,10 @@ const Profile = () => {
           }
         }
 
-        // Atualizar projeto com imagens finais
         const projectData = {
           ...portfolioForm,
-          images: finalImages.filter(img => !img.startsWith('data:')) // Remover base64 restantes
+          images: finalImages.filter(img => !img.startsWith('data:'))
         };
-
-        console.log('💾 Atualizando projeto:', projectData);
 
         const response = await api.put(
           `/professionals/${professionalId}/portfolio/${editingPortfolio.id}`,
@@ -491,11 +521,8 @@ const Profile = () => {
         }
         
       } else {
-        // ===== MODO CRIAÇÃO =====
-        
         let imageUrls = [];
         
-        // Fazer upload das imagens se houver
         if (portfolioImages.length > 0) {
           const formDataUpload = new FormData();
           portfolioImages.forEach(file => {
@@ -503,8 +530,6 @@ const Profile = () => {
           });
 
           try {
-            console.log('📤 Enviando', portfolioImages.length, 'imagens...');
-            
             const uploadResponse = await api.post(
               '/upload/portfolio-photos',
               formDataUpload,
@@ -512,8 +537,6 @@ const Profile = () => {
                 headers: { 'Content-Type': 'multipart/form-data' }
               }
             );
-
-            console.log('✅ Upload concluído:', uploadResponse.data);
 
             if (uploadResponse.data.success && uploadResponse.data.photoUrls) {
               imageUrls = uploadResponse.data.photoUrls;
@@ -526,13 +549,10 @@ const Profile = () => {
           }
         }
 
-        // Criar o projeto com as URLs das imagens
         const projectData = {
           ...portfolioForm,
           images: imageUrls
         };
-
-        console.log('💾 Salvando projeto:', projectData);
 
         const response = await api.post(
           `/professionals/${professionalId}/portfolio`,
@@ -828,24 +848,43 @@ const Profile = () => {
 
           {formData.category_id && subcategories.length > 0 && (
             <div className="form-group">
-              <label htmlFor="subcategories">Subcategorias / Especialidades</label>
-              <select
-                id="subcategories"
-                name="subcategories"
-                multiple
-                value={formData.subcategories.map(sub => typeof sub === 'object' ? sub.id : sub)}
-                onChange={handleSubcategoryChange}
-                size="5"
-                disabled={loadingCategories}
-              >
-                {subcategories.map(sub => (
-                  <option key={sub.id} value={sub.id}>
-                    {sub.name}
-                  </option>
-                ))}
-              </select>
-              <p className="help-text">
-                Segure Ctrl (Windows) ou Cmd (Mac) para selecionar múltiplas opções
+              <label>Subcategorias / Especialidades</label>
+              <p className="help-text" style={{ marginBottom: '12px' }}>
+                Selecione uma ou mais especialidades da sua área
+              </p>
+              
+              {loadingCategories ? (
+                <div className="loading-subcategories">
+                  <p>Carregando especialidades...</p>
+                </div>
+              ) : (
+                <div className="subcategories-checkbox-list">
+                  {subcategories.map(sub => (
+                    <label key={sub.id} className="checkbox-item">
+                      <input
+                        type="checkbox"
+                        value={sub.id}
+                        checked={formData.subcategories.includes(sub.id)}
+                        onChange={() => handleSubcategoryToggle(sub.id)}
+                      />
+                      <span className="checkbox-label">{sub.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              
+              {formData.subcategories.length > 0 && (
+                <p className="help-text" style={{ marginTop: '12px', color: '#10b981' }}>
+                  ✓ {formData.subcategories.length} especialidade(s) selecionada(s)
+                </p>
+              )}
+            </div>
+          )}
+
+          {formData.category_id && subcategories.length === 0 && !loadingCategories && (
+            <div className="form-group">
+              <p className="help-text" style={{ color: '#6b7280', fontStyle: 'italic', padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
+                ℹ️ Esta categoria ainda não possui subcategorias cadastradas.
               </p>
             </div>
           )}
@@ -889,6 +928,74 @@ const Profile = () => {
               rows="3"
               placeholder="Cursos, certificações, formação acadêmica..."
             />
+          </div>
+        </div>
+
+        {/* 🆕 REDES SOCIAIS E CONTATO */}
+        <div className="profile-section">
+          <h2>🌐 Redes Sociais e Website</h2>
+          <p className="section-description">
+            Adicione seus perfis nas redes sociais para facilitar o contato com clientes
+          </p>
+          
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="instagram">
+                📷 Instagram
+              </label>
+              <input
+                type="url"
+                id="instagram"
+                name="instagram"
+                value={formData.social_media.instagram || ''}
+                onChange={handleSocialMediaChange}
+                placeholder="https://instagram.com/seu-usuario"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="linkedin">
+                💼 LinkedIn
+              </label>
+              <input
+                type="url"
+                id="linkedin"
+                name="linkedin"
+                value={formData.social_media.linkedin || ''}
+                onChange={handleSocialMediaChange}
+                placeholder="https://linkedin.com/in/seu-perfil"
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="youtube">
+                📹 YouTube
+              </label>
+              <input
+                type="url"
+                id="youtube"
+                name="youtube"
+                value={formData.social_media.youtube || ''}
+                onChange={handleSocialMediaChange}
+                placeholder="https://youtube.com/@seu-canal"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="website">
+                🌐 Website / Portfólio
+              </label>
+              <input
+                type="url"
+                id="website"
+                name="website"
+                value={formData.social_media.website || ''}
+                onChange={handleSocialMediaChange}
+                placeholder="https://seusite.com.br"
+              />
+            </div>
           </div>
         </div>
 
@@ -959,9 +1066,7 @@ const Profile = () => {
         </div>
       </form>
 
-      {/* ========================================
-          MODAL DE PORTFOLIO
-          ======================================== */}
+      {/* MODAL DE PORTFOLIO (mantido igual) */}
       {showPortfolioModal && (
         <div className="modal-overlay" onClick={closePortfolioModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1060,7 +1165,6 @@ const Profile = () => {
                 />
               </div>
 
-              {/* ✅ IMAGENS - MOSTRAR TANTO NA CRIAÇÃO QUANTO NA EDIÇÃO */}
               <div className="form-group">
                 <label htmlFor="portfolio-images">
                   {editingPortfolio ? 'Gerenciar Imagens do Projeto (máx. 5)' : 'Imagens do Projeto (máx. 5)'}

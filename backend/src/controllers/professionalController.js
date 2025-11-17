@@ -1,4 +1,4 @@
-// backend/src/controllers/professionalController.js - VERSÃO CORRIGIDA COM /ME
+// backend/src/controllers/professionalController.js - VERSÃO FINAL COMPLETA
 import db from '../models/index.js';
 import { Op } from 'sequelize';
 
@@ -8,7 +8,6 @@ export const getProfessionalByUserId = async (req, res) => {
     const userId = req.user.id;
     console.log('👤 Buscando profissional para userId:', userId);
 
-    // Buscar ou criar profissional automaticamente
     let professional = await db.Professional.findOne({
       where: { user_id: userId },
       include: [
@@ -26,7 +25,6 @@ export const getProfessionalByUserId = async (req, res) => {
       ]
     });
 
-    // Se não existe, criar automaticamente
     if (!professional) {
       console.log('⚠️ Profissional não encontrado, criando automaticamente...');
       
@@ -51,7 +49,6 @@ export const getProfessionalByUserId = async (req, res) => {
 
       console.log('✅ Perfil profissional criado:', professional.id);
 
-      // Recarregar com associações
       professional = await db.Professional.findOne({
         where: { user_id: userId },
         include: [
@@ -70,7 +67,6 @@ export const getProfessionalByUserId = async (req, res) => {
       });
     }
 
-    // Formatar resposta
     const response = {
       id: professional.id,
       user_id: professional.user_id,
@@ -89,6 +85,7 @@ export const getProfessionalByUserId = async (req, res) => {
       education: professional.education,
       business_address: professional.business_address,
       google_maps_link: professional.google_maps_link,
+      social_media: professional.social_media,
       is_active: professional.is_active,
       created_at: professional.created_at,
       updated_at: professional.updated_at
@@ -127,7 +124,6 @@ export const getAllProfessionals = async (req, res) => {
     const offset = (page - 1) * limit;
     const where = { is_active: true };
 
-    // Filtros
     if (category) where.category_id = category;
     if (city) where.city = { [Op.iLike]: `%${city}%` };
     if (state) where.state = { [Op.iLike]: `%${state}%` };
@@ -226,7 +222,7 @@ export const getProfessionalById = async (req, res) => {
   }
 };
 
-// ✏️ ATUALIZAR PROFISSIONAL
+// ✏️ ATUALIZAR PROFISSIONAL - ✅ COM SOCIAL_MEDIA
 export const updateProfessional = async (req, res) => {
   try {
     const { id } = req.params;
@@ -243,8 +239,12 @@ export const updateProfessional = async (req, res) => {
       experience,
       education,
       business_address,
-      google_maps_link
+      google_maps_link,
+      social_media
     } = req.body;
+
+    console.log('📝 Atualizando profissional:', id);
+    console.log('📦 Dados recebidos:', req.body);
 
     const professional = await db.Professional.findByPk(id);
 
@@ -253,6 +253,21 @@ export const updateProfessional = async (req, res) => {
         success: false,
         error: 'Profissional não encontrado'
       });
+    }
+
+    // ✅ Preparar social_media para salvar
+    let socialMediaToSave = null;
+    if (social_media) {
+      if (typeof social_media === 'object') {
+        socialMediaToSave = social_media;
+      } else if (typeof social_media === 'string') {
+        try {
+          socialMediaToSave = JSON.parse(social_media);
+        } catch (e) {
+          console.error('Erro ao parsear social_media:', e);
+          socialMediaToSave = social_media;
+        }
+      }
     }
 
     // Atualizar dados básicos
@@ -268,8 +283,11 @@ export const updateProfessional = async (req, res) => {
       experience: experience !== undefined ? experience : professional.experience,
       education: education !== undefined ? education : professional.education,
       business_address: business_address !== undefined ? business_address : professional.business_address,
-      google_maps_link: google_maps_link !== undefined ? google_maps_link : professional.google_maps_link
+      google_maps_link: google_maps_link !== undefined ? google_maps_link : professional.google_maps_link,
+      social_media: socialMediaToSave !== null ? socialMediaToSave : professional.social_media
     });
+
+    console.log('✅ Social media salvo:', socialMediaToSave);
 
     // Atualizar subcategorias se fornecidas
     if (subcategories && Array.isArray(subcategories)) {
@@ -355,11 +373,10 @@ export const addPortfolioItem = async (req, res) => {
     console.log('➕ Criando portfolio para profissional:', id);
     console.log('📋 Dados recebidos:', { title, images: images?.length });
 
-    // ✅ GERAR ID MANUALMENTE
     const portfolioId = `port-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const portfolioItem = await db.PortfolioItem.create({
-      id: portfolioId, // ✅ ID EXPLÍCITO
+      id: portfolioId,
       professional_id: id,
       title: title || 'Sem título',
       description: description || '',
@@ -389,6 +406,7 @@ export const addPortfolioItem = async (req, res) => {
     });
   }
 };
+
 // ✏️ ATUALIZAR ITEM DO PORTFOLIO
 export const updatePortfolioItem = async (req, res) => {
   try {
@@ -407,7 +425,6 @@ export const updatePortfolioItem = async (req, res) => {
       });
     }
 
-    // ✅ Se vier um array de imagens, atualizar
     if (updateData.images && Array.isArray(updateData.images)) {
       console.log('📸 Atualizando imagens:', updateData.images.length);
     }
@@ -463,6 +480,29 @@ export const deletePortfolioItem = async (req, res) => {
   }
 };
 
+// 🤝 INDICAR PROFISSIONAL
+export const indicateProfessional = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const indicatorId = req.user.id;
+
+    // Lógica de indicação aqui
+
+    res.json({
+      success: true,
+      message: 'Profissional indicado com sucesso'
+    });
+
+  } catch (error) {
+    console.error('Erro ao indicar profissional:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao indicar profissional',
+      message: error.message
+    });
+  }
+};
+
 // 📤 UPLOAD DE IMAGENS DO PORTFOLIO
 export const uploadPortfolioImages = async (req, res) => {
   try {
@@ -475,7 +515,6 @@ export const uploadPortfolioImages = async (req, res) => {
       });
     }
 
-    // As URLs já vêm do multer/cloudinary configurado
     const imageUrls = req.files.map(file => file.path);
 
     res.json({
@@ -535,29 +574,6 @@ export const deletePortfolioImage = async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Erro ao deletar imagem',
-      message: error.message
-    });
-  }
-};
-
-// 🤝 INDICAR PROFISSIONAL
-export const indicateProfessional = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const indicatorId = req.user.id;
-
-    // Lógica de indicação aqui
-
-    res.json({
-      success: true,
-      message: 'Profissional indicado com sucesso'
-    });
-
-  } catch (error) {
-    console.error('Erro ao indicar profissional:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erro ao indicar profissional',
       message: error.message
     });
   }
