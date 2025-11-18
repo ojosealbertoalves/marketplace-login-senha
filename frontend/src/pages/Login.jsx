@@ -70,8 +70,11 @@ const Login = () => {
     setErrors({});
 
     try {
-      // ✅ CORRIGIDO: Passar formData como objeto
-      const result = await login(formData);
+      
+     const result = await login({
+  email: formData.email,
+  password: formData.password
+})
       
       if (result.success) {
         // Redirecionar para onde estava tentando acessar ou página inicial

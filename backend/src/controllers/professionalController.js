@@ -109,6 +109,8 @@ export const getProfessionalByUserId = async (req, res) => {
 };
 
 // 📋 LISTAR TODOS OS PROFISSIONAIS
+
+
 export const getAllProfessionals = async (req, res) => {
   try {
     const {
@@ -150,6 +152,18 @@ export const getAllProfessionals = async (req, res) => {
           ...(subcategory && {
             where: { id: subcategory }
           })
+        },
+        // ✅ NOVO: Include do User para filtrar clientes
+        {
+          model: db.User,
+          as: 'user',
+          attributes: ['id', 'user_type', 'name'],
+          where: {
+            user_type: {
+              [Op.in]: ['professional', 'company'] // ← APENAS profissionais e empresas
+            }
+          },
+          required: false // ← IMPORTANTE: LEFT JOIN para compatibilidade com profissionais antigos sem user_id
         }
       ],
       limit: parseInt(limit),
@@ -157,14 +171,23 @@ export const getAllProfessionals = async (req, res) => {
       order: [['created_at', 'DESC']]
     });
 
+    // ✅ FILTRO ADICIONAL: Remover profissionais sem user OU com user_type = 'client'
+    const filteredProfessionals = professionals.filter(prof => {
+      // Se não tem user, mantém (compatibilidade com dados antigos)
+      if (!prof.user) return true;
+      
+      // Se tem user, só mantém se for professional ou company
+      return prof.user.user_type === 'professional' || prof.user.user_type === 'company';
+    });
+
     res.json({
       success: true,
-      data: professionals,
+      data: filteredProfessionals,
       pagination: {
-        total: count,
+        total: filteredProfessionals.length, // ← Conta filtrada
         page: parseInt(page),
         limit: parseInt(limit),
-        totalPages: Math.ceil(count / limit)
+        totalPages: Math.ceil(filteredProfessionals.length / limit)
       }
     });
 
@@ -177,6 +200,11 @@ export const getAllProfessionals = async (req, res) => {
     });
   }
 };
+
+
+
+
+
 
 // 🔍 BUSCAR PROFISSIONAL POR ID
 export const getProfessionalById = async (req, res) => {

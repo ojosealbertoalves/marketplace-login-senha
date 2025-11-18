@@ -1,4 +1,4 @@
-// frontend/src/contexts/AuthContext.jsx - COM REFRESH USER
+// frontend/src/contexts/AuthContext.jsx - VERSÃO CORRIGIDA
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
@@ -16,22 +16,40 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Carregar usuário do localStorage ao iniciar
+  // ✅ CORRIGIDO: Carregar usuário do localStorage ao iniciar
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+    if (storedToken && storedUser && storedUser !== 'undefined' && storedUser !== 'null') {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setToken(storedToken);
+        setUser(parsedUser);
+        console.log('✅ Usuário carregado do localStorage:', parsedUser);
+      } catch (error) {
+        console.error('❌ Erro ao parsear usuário do localStorage:', error);
+        // Limpa localStorage se tiver dados corrompidos
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    } else {
+      // Limpa localStorage se tiver dados inválidos
+      console.log('⚠️ Dados inválidos no localStorage, limpando...');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
     }
 
     setLoading(false);
   }, []);
 
-  // Login
+  // ✅ CORRIGIDO: Login
   const login = async (credentials) => {
     try {
+      console.log('🔐 Tentando login...', credentials);
+      console.log('📧 Email:', credentials.email);
+      console.log('🔒 Password:', credentials.password ? '***' : 'VAZIO');
+
       const response = await fetch('http://localhost:3001/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -40,26 +58,50 @@ export function AuthProvider({ children }) {
 
       const data = await response.json();
 
+      console.log('📦 Resposta do servidor:', data);
+
       if (!response.ok) {
+        console.error('❌ Erro do servidor:', data);
         return { success: false, error: data.error || 'Erro ao fazer login' };
       }
 
-      setToken(data.token);
-      setUser(data.user);
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      // ✅ CORRIGIDO: Verificar estrutura da resposta
+      if (data.success && data.data) {
+        const { user: userData, token: userToken } = data.data;
 
-      return { success: true, data };
+        console.log('✅ Login bem-sucedido!', userData);
+
+        setToken(userToken);
+        setUser(userData);
+        localStorage.setItem('token', userToken);
+        localStorage.setItem('user', JSON.stringify(userData));
+
+        return { success: true, user: userData, token: userToken };
+      } else if (data.token && data.user) {
+        // Formato alternativo de resposta
+        console.log('✅ Login bem-sucedido (formato alternativo)!', data.user);
+
+        setToken(data.token);
+        setUser(data.user);
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        return { success: true, user: data.user, token: data.token };
+      }
+
+      return { success: false, error: 'Resposta inválida do servidor' };
 
     } catch (error) {
-      console.error('Erro ao fazer login:', error);
+      console.error('💥 Erro ao fazer login:', error);
       return { success: false, error: 'Erro de conexão' };
     }
   };
 
-  // Registro
+  // ✅ CORRIGIDO: Registro
   const register = async (userData) => {
     try {
+      console.log('📝 Tentando cadastro...', userData);
+
       const response = await fetch('http://localhost:3001/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,25 +110,47 @@ export function AuthProvider({ children }) {
 
       const data = await response.json();
 
+      console.log('📦 Resposta do servidor:', data);
+
       if (!response.ok) {
+        console.error('❌ Erro do servidor:', data);
         return { success: false, error: data.error || 'Erro ao criar conta' };
       }
 
-      setToken(data.token);
-      setUser(data.user);
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      // ✅ Verificar estrutura da resposta
+      if (data.success && data.data) {
+        const { user: newUser, token: userToken } = data.data;
 
-      return { success: true, data };
+        console.log('✅ Cadastro bem-sucedido!', newUser);
+
+        setToken(userToken);
+        setUser(newUser);
+        localStorage.setItem('token', userToken);
+        localStorage.setItem('user', JSON.stringify(newUser));
+
+        return { success: true, user: newUser, token: userToken };
+      } else if (data.token && data.user) {
+        console.log('✅ Cadastro bem-sucedido (formato alternativo)!', data.user);
+
+        setToken(data.token);
+        setUser(data.user);
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        return { success: true, user: data.user, token: data.token };
+      }
+
+      return { success: false, error: 'Resposta inválida do servidor' };
 
     } catch (error) {
-      console.error('Erro ao registrar:', error);
+      console.error('💥 Erro ao registrar:', error);
       return { success: false, error: 'Erro de conexão' };
     }
   };
 
   // Logout
   const logout = async () => {
+    console.log('👋 Fazendo logout...');
     setUser(null);
     setToken(null);
     localStorage.removeItem('token');
@@ -96,7 +160,9 @@ export function AuthProvider({ children }) {
   // Atualizar perfil
   const updateProfile = async (profileData) => {
     try {
-      const response = await fetch('http://localhost:3001/api/profile/update', {
+      console.log('🔄 Atualizando perfil...', profileData);
+
+      const response = await fetch('http://localhost:3001/api/auth/profile/update', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -111,69 +177,77 @@ export function AuthProvider({ children }) {
         return { success: false, error: data.error || 'Erro ao atualizar perfil' };
       }
 
-      setUser(data.user);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      return { success: true, data };
+      // Atualizar usuário local
+      const updatedUser = data.data?.user || data.user;
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+
+      console.log('✅ Perfil atualizado!', updatedUser);
+
+      return { success: true, data: updatedUser };
 
     } catch (error) {
-      console.error('Erro ao atualizar perfil:', error);
+      console.error('❌ Erro ao atualizar perfil:', error);
       return { success: false, error: 'Erro de conexão' };
     }
   };
 
-  // ✅ NOVA FUNÇÃO: Recarregar dados do usuário e do profissional
+  // ✅ Recarregar dados do usuário
   const refreshUser = async () => {
     try {
-      if (!token) return { success: false, error: 'Não autenticado' };
+      if (!token) {
+        console.log('⚠️ Sem token, não é possível recarregar');
+        return { success: false, error: 'Não autenticado' };
+      }
 
       console.log('🔄 Recarregando dados do usuário...');
       
-      // Buscar dados do usuário
-      const userResponse = await fetch('http://localhost:3001/api/auth/me', {
+      // Tentar buscar do endpoint /auth/profile
+      const userResponse = await fetch('http://localhost:3001/api/auth/profile', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
-      if (!userResponse.ok) {
-        console.log('⚠️ Endpoint /auth/me não existe, tentando /professionals/me...');
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        const newUser = userData.data?.user || userData.user || userData.data;
+
+        console.log('✅ Dados recarregados:', newUser);
+
+        setUser(newUser);
+        localStorage.setItem('user', JSON.stringify(newUser));
         
-        // Se não existir /auth/me, buscar do profissional
-        const profResponse = await fetch('http://localhost:3001/api/professionals/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        const profData = await profResponse.json();
-
-        if (!profResponse.ok) {
-          return { success: false, error: profData.error || 'Erro ao recarregar dados' };
-        }
-
-        // Atualizar foto do usuário com a foto do profissional
-        const updatedUser = {
-          ...user,
-          profile_photo: profData.data.profile_photo
-        };
-
-        console.log('✅ Dados recarregados do profissional:', updatedUser);
-
-        setUser(updatedUser);
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        
-        return { success: true, data: updatedUser };
+        return { success: true, data: newUser };
       }
 
-      const userData = await userResponse.json();
-
-      console.log('✅ Dados do usuário recarregados:', userData.user || userData.data);
-
-      const newUser = userData.user || userData.data;
-      setUser(newUser);
-      localStorage.setItem('user', JSON.stringify(newUser));
+      // Se não funcionar, tentar /professionals/me
+      console.log('⚠️ /auth/profile não disponível, tentando /professionals/me...');
       
-      return { success: true, data: newUser };
+      const profResponse = await fetch('http://localhost:3001/api/professionals/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const profData = await profResponse.json();
+
+      if (!profResponse.ok) {
+        return { success: false, error: profData.error || 'Erro ao recarregar dados' };
+      }
+
+      // Mesclar dados do profissional com o user atual
+      const updatedUser = {
+        ...user,
+        profile_photo: profData.data?.profile_photo || profData.profile_photo
+      };
+
+      console.log('✅ Dados recarregados do profissional:', updatedUser);
+
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      return { success: true, data: updatedUser };
 
     } catch (error) {
       console.error('❌ Erro ao recarregar usuário:', error);
@@ -241,6 +315,7 @@ export function AuthProvider({ children }) {
 
     // Se token expirou, fazer logout
     if (response.status === 401) {
+      console.log('🔒 Token expirado, fazendo logout...');
       await logout();
       throw new Error('Sessão expirada');
     }
@@ -252,7 +327,7 @@ export function AuthProvider({ children }) {
     user,
     token,
     loading,
-    isAuthenticated: !!token,
+    isAuthenticated: !!token && !!user,
     isAdmin: user?.user_type === 'admin',
     isProfessional: user?.user_type === 'professional',
     isCompany: user?.user_type === 'company',
@@ -261,7 +336,7 @@ export function AuthProvider({ children }) {
     register,
     logout,
     updateProfile,
-    refreshUser, // ✅ NOVA FUNÇÃO
+    refreshUser,
     hasPermission,
     getAuthHeaders,
     authFetch

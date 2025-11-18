@@ -1,4 +1,4 @@
-// frontend/src/pages/Profile.jsx - VERSÃO COM REDES SOCIAIS
+// frontend/src/pages/Profile.jsx - VERSÃO MULTI-TIPO DE USUÁRIO
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -17,14 +17,28 @@ const Profile = () => {
     phone: '',
     city: '',
     state: '',
+    user_type: 'professional', // Tipo de usuário
+    
+    // Campos Profissional
+    cpf: '',
+    category_id: '',
+    subcategories: [],
     description: '',
     experience: '',
     education: '',
     whatsapp: '',
     business_address: '',
     google_maps_link: '',
-    category_id: '',
-    subcategories: [],
+    
+    // Campos Empresa
+    company_name: '',
+    cnpj: '',
+    website: '',
+    
+    // Campos Cliente
+    documento: '',
+    
+    // Redes sociais
     social_media: {
       instagram: '',
       linkedin: '',
@@ -43,7 +57,7 @@ const Profile = () => {
   const [subcategories, setSubcategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
 
-  // Estados de portfolio
+  // Estados de portfolio (apenas para profissionais)
   const [portfolioItems, setPortfolioItems] = useState([]);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [editingPortfolio, setEditingPortfolio] = useState(null);
@@ -60,7 +74,7 @@ const Profile = () => {
   const [portfolioImagePreviews, setPortfolioImagePreviews] = useState([]);
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
 
-  const [professionalId, setProfessionalId] = useState(null);
+  const [userId, setUserId] = useState(null);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -72,12 +86,12 @@ const Profile = () => {
 
   // Carregar subcategorias quando categoria mudar
   useEffect(() => {
-    if (formData.category_id) {
+    if (formData.category_id && formData.user_type === 'professional') {
       loadSubcategories(formData.category_id);
     } else {
       setSubcategories([]);
     }
-  }, [formData.category_id]);
+  }, [formData.category_id, formData.user_type]);
 
   // ========================================
   // FUNÇÕES DE CARREGAMENTO
@@ -86,16 +100,24 @@ const Profile = () => {
   const loadUserData = async () => {
     try {
       setLoading(true);
+      setError('');
       
-      const response = await api.get('/professionals/me');
-      const professional = response.data.data;
+      // ✅ USA A ROTA /auth/profile QUE FUNCIONA PARA TODOS
+      const response = await api.get('/auth/profile');
       
-      setProfessionalId(professional.id);
+      if (!response.data.success) {
+        throw new Error('Erro ao carregar dados');
+      }
       
-      // Normalizar subcategorias - converter objetos para IDs
+      const userData = response.data.data;
+      console.log('✅ Dados do usuário carregados:', userData);
+      
+      setUserId(userData.id);
+      
+      // Normalizar subcategorias
       let subcategoriesIds = [];
-      if (professional.subcategories && Array.isArray(professional.subcategories)) {
-        subcategoriesIds = professional.subcategories.map(sub => 
+      if (userData.subcategories && Array.isArray(userData.subcategories)) {
+        subcategoriesIds = userData.subcategories.map(sub => 
           typeof sub === 'object' ? sub.id : sub
         );
       }
@@ -108,44 +130,62 @@ const Profile = () => {
         website: ''
       };
 
-      if (professional.social_media) {
-        if (typeof professional.social_media === 'string') {
+      if (userData.social_media) {
+        if (typeof userData.social_media === 'string') {
           try {
-            socialMedia = { ...socialMedia, ...JSON.parse(professional.social_media) };
+            socialMedia = { ...socialMedia, ...JSON.parse(userData.social_media) };
           } catch (e) {
             console.error('Erro ao parsear social_media:', e);
           }
-        } else if (typeof professional.social_media === 'object') {
-          socialMedia = { ...socialMedia, ...professional.social_media };
+        } else if (typeof userData.social_media === 'object') {
+          socialMedia = { ...socialMedia, ...userData.social_media };
         }
       }
       
+      // ✅ CARREGA TODOS OS CAMPOS INDEPENDENTE DO TIPO
       setFormData({
-        name: professional.name || '',
-        email: professional.email || '',
-        phone: professional.phone || '',
-        city: professional.city || '',
-        state: professional.state || '',
-        description: professional.description || '',
-        experience: professional.experience || '',
-        education: professional.education || '',
-        whatsapp: professional.whatsapp || '',
-        business_address: professional.business_address || '',
-        google_maps_link: professional.google_maps_link || '',
-        category_id: professional.category_id || '',
+        name: userData.name || '',
+        email: userData.email || '',
+        phone: userData.phone || '',
+        city: userData.city || '',
+        state: userData.state || '',
+        user_type: userData.user_type || 'client',
+        
+        // Profissional
+        cpf: userData.cpf || '',
+        category_id: userData.category_id || '',
         subcategories: subcategoriesIds,
+        description: userData.description || '',
+        experience: userData.experience || '',
+        education: userData.education || '',
+        whatsapp: userData.whatsapp || '',
+        business_address: userData.business_address || '',
+        google_maps_link: userData.google_maps_link || '',
+        
+        // Empresa
+        company_name: userData.company_name || '',
+        cnpj: userData.cnpj || '',
+        website: userData.website || '',
+        
+        // Cliente / Geral
+        documento: userData.documento || userData.cpf || userData.cnpj || '',
+        
+        // Redes sociais
         social_media: socialMedia
       });
 
-      if (professional.profile_photo) {
-        setPhotoPreview(professional.profile_photo);
+      if (userData.profile_photo) {
+        setPhotoPreview(userData.profile_photo);
       }
 
-      await loadPortfolio(professional.id);
+      // Carregar portfolio apenas se for profissional
+      if (userData.user_type === 'professional' && userData.id) {
+        await loadPortfolio(userData.id);
+      }
 
     } catch (err) {
-      console.error('Erro ao carregar dados:', err);
-      setError('Erro ao carregar seus dados');
+      console.error('❌ Erro ao carregar dados do usuário:', err);
+      setError(err.response?.data?.error || 'Erro ao carregar seus dados');
     } finally {
       setLoading(false);
     }
@@ -205,6 +245,15 @@ const Profile = () => {
     }));
   };
 
+  const handleUserTypeChange = (newType) => {
+    if (window.confirm(`Tem certeza que deseja mudar para ${newType === 'professional' ? 'Profissional' : newType === 'company' ? 'Empresa' : 'Cliente Final'}?`)) {
+      setFormData(prev => ({
+        ...prev,
+        user_type: newType
+      }));
+    }
+  };
+
   const handleSocialMediaChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -238,15 +287,17 @@ const Profile = () => {
       setError('');
       setSuccess('');
 
-      const response = await api.put(`/professionals/${professionalId}`, formData);
+      // ✅ USA A ROTA /auth/profile QUE FUNCIONA PARA TODOS
+      const response = await api.put('/auth/profile', formData);
 
       if (response.data.success) {
         setSuccess('Perfil atualizado com sucesso!');
+        await refreshUser();
         await loadUserData();
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Erro ao atualizar perfil');
-      console.error(err);
+      setError(err.response?.data?.error || err.response?.data?.message || 'Erro ao atualizar perfil');
+      console.error('❌ Erro ao atualizar:', err);
     } finally {
       setLoading(false);
     }
@@ -344,7 +395,7 @@ const Profile = () => {
   };
 
   // ========================================
-  // HANDLERS DE PORTFOLIO (mantidos iguais)
+  // HANDLERS DE PORTFOLIO (mantidos iguais, mas apenas para profissionais)
   // ========================================
 
   const openPortfolioModal = (item = null) => {
@@ -510,13 +561,13 @@ const Profile = () => {
         };
 
         const response = await api.put(
-          `/professionals/${professionalId}/portfolio/${editingPortfolio.id}`,
+          `/professionals/${userId}/portfolio/${editingPortfolio.id}`,
           projectData
         );
 
         if (response.data.success) {
           setSuccess('Projeto atualizado com sucesso!');
-          await loadPortfolio(professionalId);
+          await loadPortfolio(userId);
           closePortfolioModal();
         }
         
@@ -555,13 +606,13 @@ const Profile = () => {
         };
 
         const response = await api.post(
-          `/professionals/${professionalId}/portfolio`,
+          `/professionals/${userId}/portfolio`,
           projectData
         );
 
         if (response.data.success) {
           setSuccess('Projeto adicionado com sucesso!');
-          await loadPortfolio(professionalId);
+          await loadPortfolio(userId);
           closePortfolioModal();
         }
       }
@@ -582,12 +633,12 @@ const Profile = () => {
       setLoading(true);
       
       const response = await api.delete(
-        `/professionals/${professionalId}/portfolio/${itemId}`
+        `/professionals/${userId}/portfolio/${itemId}`
       );
 
       if (response.data.success) {
         setSuccess('Projeto removido com sucesso!');
-        await loadPortfolio(professionalId);
+        await loadPortfolio(userId);
       }
     } catch (err) {
       console.error('❌ Erro ao deletar projeto:', err);
@@ -601,7 +652,7 @@ const Profile = () => {
   // RENDER
   // ========================================
 
-  if (loading && !professionalId) {
+  if (loading && !userId) {
     return (
       <div className="profile-loading">
         <div className="loading-spinner"></div>
@@ -609,6 +660,10 @@ const Profile = () => {
       </div>
     );
   }
+
+  const isProfessional = formData.user_type === 'professional';
+  const isCompany = formData.user_type === 'company';
+  const isClient = formData.user_type === 'client';
 
   return (
     <div className="profile-container">
@@ -626,6 +681,54 @@ const Profile = () => {
           <button onClick={() => setSuccess('')} className="alert-close">×</button>
         </div>
       )}
+
+      {/* ========================================
+          SELETOR DE TIPO DE USUÁRIO
+          ======================================== */}
+      <div className="profile-section user-type-section">
+        <h2>👤 Tipo de Conta</h2>
+        <p className="section-description">
+          Escolha como você quer aparecer na plataforma
+        </p>
+        
+        <div className="user-type-selector">
+          <button
+            type="button"
+            className={`type-button ${isProfessional ? 'active' : ''}`}
+            onClick={() => handleUserTypeChange('professional')}
+          >
+            <span className="type-icon">👷</span>
+            <div>
+              <strong>Profissional</strong>
+              <small>Apareço nas buscas como prestador de serviços</small>
+            </div>
+          </button>
+          
+          <button
+            type="button"
+            className={`type-button ${isCompany ? 'active' : ''}`}
+            onClick={() => handleUserTypeChange('company')}
+          >
+            <span className="type-icon">🏢</span>
+            <div>
+              <strong>Empresa</strong>
+              <small>Apareço nas buscas representando minha empresa</small>
+            </div>
+          </button>
+          
+          <button
+            type="button"
+            className={`type-button ${isClient ? 'active' : ''}`}
+            onClick={() => handleUserTypeChange('client')}
+          >
+            <span className="type-icon">👤</span>
+            <div>
+              <strong>Cliente Final</strong>
+              <small>Não apareço nas buscas, apenas busco profissionais</small>
+            </div>
+          </button>
+        </div>
+      </div>
 
       {/* ========================================
           FOTO DE PERFIL
@@ -675,89 +778,91 @@ const Profile = () => {
       </div>
 
       {/* ========================================
-          PORTFOLIO
+          PORTFOLIO (APENAS PARA PROFISSIONAIS)
           ======================================== */}
-      <div className="profile-section portfolio-section">
-        <div className="portfolio-header">
-          <div className="section-header">
-            <h2>🎨 Meu Portfolio</h2>
-          </div>
-          <button
-            type="button"
-            onClick={() => openPortfolioModal()}
-            className="btn btn-primary"
-          >
-            ➕ Adicionar Projeto
-          </button>
-        </div>
-        <p className="section-description">
-          Mostre seus melhores trabalhos para atrair mais clientes
-        </p>
-
-        {portfolioItems.length > 0 ? (
-          <div className="portfolio-grid">
-            {portfolioItems.map((item) => (
-              <div key={item.id} className="portfolio-card">
-                <div className="portfolio-card-image">
-                  {item.images && item.images.length > 0 ? (
-                    <>
-                      <img
-                        src={item.images[0]}
-                        alt={item.title}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.parentElement.innerHTML = '<div class="no-image">📷</div>';
-                        }}
-                      />
-                      {item.images.length > 1 && (
-                        <span className="image-count">+{item.images.length - 1}</span>
-                      )}
-                    </>
-                  ) : (
-                    <div className="no-image">📷</div>
-                  )}
-                </div>
-                <div className="portfolio-card-content">
-                  <h3>{item.title}</h3>
-                  {item.project_type && (
-                    <span className="project-type">{item.project_type}</span>
-                  )}
-                  {item.description && (
-                    <p className="portfolio-description">{item.description}</p>
-                  )}
-                  <div className="portfolio-card-actions">
-                    <button
-                      type="button"
-                      onClick={() => openPortfolioModal(item)}
-                      className="btn btn-sm btn-secondary"
-                    >
-                      ✏️ Editar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePortfolioItem(item.id)}
-                      className="btn btn-sm btn-danger"
-                    >
-                      🗑️ Remover
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <p>📁 Você ainda não adicionou nenhum projeto ao seu portfolio</p>
+      {isProfessional && (
+        <div className="profile-section portfolio-section">
+          <div className="portfolio-header">
+            <div className="section-header">
+              <h2>🎨 Meu Portfolio</h2>
+            </div>
             <button
               type="button"
               onClick={() => openPortfolioModal()}
               className="btn btn-primary"
             >
-              ➕ Adicionar Primeiro Projeto
+              ➕ Adicionar Projeto
             </button>
           </div>
-        )}
-      </div>
+          <p className="section-description">
+            Mostre seus melhores trabalhos para atrair mais clientes
+          </p>
+
+          {portfolioItems.length > 0 ? (
+            <div className="portfolio-grid">
+              {portfolioItems.map((item) => (
+                <div key={item.id} className="portfolio-card">
+                  <div className="portfolio-card-image">
+                    {item.images && item.images.length > 0 ? (
+                      <>
+                        <img
+                          src={item.images[0]}
+                          alt={item.title}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.parentElement.innerHTML = '<div class="no-image">📷</div>';
+                          }}
+                        />
+                        {item.images.length > 1 && (
+                          <span className="image-count">+{item.images.length - 1}</span>
+                        )}
+                      </>
+                    ) : (
+                      <div className="no-image">📷</div>
+                    )}
+                  </div>
+                  <div className="portfolio-card-content">
+                    <h3>{item.title}</h3>
+                    {item.project_type && (
+                      <span className="project-type">{item.project_type}</span>
+                    )}
+                    {item.description && (
+                      <p className="portfolio-description">{item.description}</p>
+                    )}
+                    <div className="portfolio-card-actions">
+                      <button
+                        type="button"
+                        onClick={() => openPortfolioModal(item)}
+                        className="btn btn-sm btn-secondary"
+                      >
+                        ✏️ Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePortfolioItem(item.id)}
+                        className="btn btn-sm btn-danger"
+                      >
+                        🗑️ Remover
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <p>📁 Você ainda não adicionou nenhum projeto ao seu portfolio</p>
+              <button
+                type="button"
+                onClick={() => openPortfolioModal()}
+                className="btn btn-primary"
+              >
+                ➕ Adicionar Primeiro Projeto
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ========================================
           FORMULÁRIO PRINCIPAL
@@ -766,11 +871,13 @@ const Profile = () => {
         
         {/* INFORMAÇÕES PESSOAIS */}
         <div className="profile-section">
-          <h2>👤 Informações Pessoais</h2>
+          <h2>👤 Informações {isCompany ? 'da Empresa' : 'Pessoais'}</h2>
           
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="name">Nome Completo *</label>
+              <label htmlFor="name">
+                {isCompany ? 'Nome do Responsável' : 'Nome Completo'} *
+              </label>
               <input
                 type="text"
                 id="name"
@@ -778,7 +885,7 @@ const Profile = () => {
                 value={formData.name}
                 onChange={handleChange}
                 required
-                placeholder="Seu nome completo"
+                placeholder={isCompany ? "Nome do responsável" : "Seu nome completo"}
               />
             </div>
 
@@ -796,7 +903,63 @@ const Profile = () => {
             </div>
           </div>
 
+          {isCompany && (
+            <div className="form-group">
+              <label htmlFor="company_name">Nome da Empresa *</label>
+              <input
+                type="text"
+                id="company_name"
+                name="company_name"
+                value={formData.company_name}
+                onChange={handleChange}
+                placeholder="Nome fantasia ou razão social"
+              />
+            </div>
+          )}
+
           <div className="form-row">
+            {isProfessional && (
+              <div className="form-group">
+                <label htmlFor="cpf">CPF</label>
+                <input
+                  type="text"
+                  id="cpf"
+                  name="cpf"
+                  value={formData.cpf}
+                  onChange={handleChange}
+                  placeholder="000.000.000-00"
+                />
+              </div>
+            )}
+
+            {isCompany && (
+              <div className="form-group">
+                <label htmlFor="cnpj">CNPJ</label>
+                <input
+                  type="text"
+                  id="cnpj"
+                  name="cnpj"
+                  value={formData.cnpj}
+                  onChange={handleChange}
+                  placeholder="00.000.000/0000-00"
+                />
+              </div>
+            )}
+
+            {isClient && (
+              <div className="form-group">
+                <label htmlFor="documento">CPF/CNPJ</label>
+                <input
+                  type="text"
+                  id="documento"
+                  name="documento"
+                  value={formData.documento}
+                  onChange={handleChange}
+                  placeholder="Seu documento"
+                />
+              </div>
+            )}
+
             <div className="form-group">
               <label htmlFor="phone">Telefone</label>
               <input
@@ -808,7 +971,9 @@ const Profile = () => {
                 placeholder="(00) 00000-0000"
               />
             </div>
+          </div>
 
+          {isProfessional && (
             <div className="form-group">
               <label htmlFor="whatsapp">WhatsApp</label>
               <input
@@ -820,184 +985,188 @@ const Profile = () => {
                 placeholder="(00) 00000-0000"
               />
             </div>
-          </div>
+          )}
         </div>
 
-        {/* CATEGORIA E ESPECIALIDADES */}
-        <div className="profile-section">
-          <h2>🏷️ Categoria e Especialidades</h2>
-          
-          <div className="form-group">
-            <label htmlFor="category_id">Categoria Principal *</label>
-            <select
-              id="category_id"
-              name="category_id"
-              value={formData.category_id}
-              onChange={handleChange}
-              required
-              disabled={loadingCategories}
-            >
-              <option value="">Selecione uma categoria</option>
-              {categories.map(category => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {formData.category_id && subcategories.length > 0 && (
+        {/* CATEGORIA E ESPECIALIDADES (APENAS PROFISSIONAL) */}
+        {isProfessional && (
+          <div className="profile-section">
+            <h2>🏷️ Categoria e Especialidades</h2>
+            
             <div className="form-group">
-              <label>Subcategorias / Especialidades</label>
-              <p className="help-text" style={{ marginBottom: '12px' }}>
-                Selecione uma ou mais especialidades da sua área
-              </p>
-              
-              {loadingCategories ? (
-                <div className="loading-subcategories">
-                  <p>Carregando especialidades...</p>
-                </div>
-              ) : (
-                <div className="subcategories-checkbox-list">
-                  {subcategories.map(sub => (
-                    <label key={sub.id} className="checkbox-item">
-                      <input
-                        type="checkbox"
-                        value={sub.id}
-                        checked={formData.subcategories.includes(sub.id)}
-                        onChange={() => handleSubcategoryToggle(sub.id)}
-                      />
-                      <span className="checkbox-label">{sub.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-              
-              {formData.subcategories.length > 0 && (
-                <p className="help-text" style={{ marginTop: '12px', color: '#10b981' }}>
-                  ✓ {formData.subcategories.length} especialidade(s) selecionada(s)
+              <label htmlFor="category_id">Categoria Principal *</label>
+              <select
+                id="category_id"
+                name="category_id"
+                value={formData.category_id}
+                onChange={handleChange}
+                required
+                disabled={loadingCategories}
+              >
+                <option value="">Selecione uma categoria</option>
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {formData.category_id && subcategories.length > 0 && (
+              <div className="form-group">
+                <label>Subcategorias / Especialidades</label>
+                <p className="help-text" style={{ marginBottom: '12px' }}>
+                  Selecione uma ou mais especialidades da sua área
                 </p>
-              )}
-            </div>
-          )}
+                
+                {loadingCategories ? (
+                  <div className="loading-subcategories">
+                    <p>Carregando especialidades...</p>
+                  </div>
+                ) : (
+                  <div className="subcategories-checkbox-list">
+                    {subcategories.map(sub => (
+                      <label key={sub.id} className="checkbox-item">
+                        <input
+                          type="checkbox"
+                          value={sub.id}
+                          checked={formData.subcategories.includes(sub.id)}
+                          onChange={() => handleSubcategoryToggle(sub.id)}
+                        />
+                        <span className="checkbox-label">{sub.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                
+                {formData.subcategories.length > 0 && (
+                  <p className="help-text" style={{ marginTop: '12px', color: '#10b981' }}>
+                    ✓ {formData.subcategories.length} especialidade(s) selecionada(s)
+                  </p>
+                )}
+              </div>
+            )}
 
-          {formData.category_id && subcategories.length === 0 && !loadingCategories && (
-            <div className="form-group">
-              <p className="help-text" style={{ color: '#6b7280', fontStyle: 'italic', padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
-                ℹ️ Esta categoria ainda não possui subcategorias cadastradas.
-              </p>
-            </div>
-          )}
-        </div>
+            {formData.category_id && subcategories.length === 0 && !loadingCategories && (
+              <div className="form-group">
+                <p className="help-text" style={{ color: '#6b7280', fontStyle: 'italic', padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
+                  ℹ️ Esta categoria ainda não possui subcategorias cadastradas.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* INFORMAÇÕES PROFISSIONAIS */}
-        <div className="profile-section">
-          <h2>💼 Informações Profissionais</h2>
-          
-          <div className="form-group">
-            <label htmlFor="description">Sobre Você</label>
-            <textarea
-              id="description"
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              rows="4"
-              placeholder="Conte um pouco sobre você e seu trabalho..."
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="experience">Experiência</label>
-            <textarea
-              id="experience"
-              name="experience"
-              value={formData.experience}
-              onChange={handleChange}
-              rows="3"
-              placeholder="Descreva sua experiência profissional..."
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="education">Formação</label>
-            <textarea
-              id="education"
-              name="education"
-              value={formData.education}
-              onChange={handleChange}
-              rows="3"
-              placeholder="Cursos, certificações, formação acadêmica..."
-            />
-          </div>
-        </div>
-
-        {/* 🆕 REDES SOCIAIS E CONTATO */}
-        <div className="profile-section">
-          <h2>🌐 Redes Sociais e Website</h2>
-          <p className="section-description">
-            Adicione seus perfis nas redes sociais para facilitar o contato com clientes
-          </p>
-          
-          <div className="form-row">
+        {(isProfessional || isCompany) && (
+          <div className="profile-section">
+            <h2>💼 Informações {isCompany ? 'da Empresa' : 'Profissionais'}</h2>
+            
             <div className="form-group">
-              <label htmlFor="instagram">
-                📷 Instagram
+              <label htmlFor="description">
+                {isCompany ? 'Sobre a Empresa' : 'Sobre Você'}
               </label>
-              <input
-                type="url"
-                id="instagram"
-                name="instagram"
-                value={formData.social_media.instagram || ''}
-                onChange={handleSocialMediaChange}
-                placeholder="https://instagram.com/seu-usuario"
+              <textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows="4"
+                placeholder={isCompany ? "Conte sobre sua empresa..." : "Conte um pouco sobre você e seu trabalho..."}
               />
             </div>
 
-            <div className="form-group">
-              <label htmlFor="linkedin">
-                💼 LinkedIn
-              </label>
-              <input
-                type="url"
-                id="linkedin"
-                name="linkedin"
-                value={formData.social_media.linkedin || ''}
-                onChange={handleSocialMediaChange}
-                placeholder="https://linkedin.com/in/seu-perfil"
-              />
+            {isProfessional && (
+              <>
+                <div className="form-group">
+                  <label htmlFor="experience">Experiência</label>
+                  <textarea
+                    id="experience"
+                    name="experience"
+                    value={formData.experience}
+                    onChange={handleChange}
+                    rows="3"
+                    placeholder="Descreva sua experiência profissional..."
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="education">Formação</label>
+                  <textarea
+                    id="education"
+                    name="education"
+                    value={formData.education}
+                    onChange={handleChange}
+                    rows="3"
+                    placeholder="Cursos, certificações, formação acadêmica..."
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* REDES SOCIAIS */}
+        {(isProfessional || isCompany) && (
+          <div className="profile-section">
+            <h2>🌐 Redes Sociais e Website</h2>
+            <p className="section-description">
+              Adicione seus perfis nas redes sociais para facilitar o contato com clientes
+            </p>
+            
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="instagram">📷 Instagram</label>
+                <input
+                  type="url"
+                  id="instagram"
+                  name="instagram"
+                  value={formData.social_media.instagram || ''}
+                  onChange={handleSocialMediaChange}
+                  placeholder="https://instagram.com/seu-usuario"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="linkedin">💼 LinkedIn</label>
+                <input
+                  type="url"
+                  id="linkedin"
+                  name="linkedin"
+                  value={formData.social_media.linkedin || ''}
+                  onChange={handleSocialMediaChange}
+                  placeholder="https://linkedin.com/in/seu-perfil"
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="youtube">📹 YouTube</label>
+                <input
+                  type="url"
+                  id="youtube"
+                  name="youtube"
+                  value={formData.social_media.youtube || ''}
+                  onChange={handleSocialMediaChange}
+                  placeholder="https://youtube.com/@seu-canal"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="website">🌐 Website / Portfólio</label>
+                <input
+                  type="url"
+                  id="website"
+                  name="website"
+                  value={isCompany ? formData.website : formData.social_media.website || ''}
+                  onChange={isCompany ? handleChange : handleSocialMediaChange}
+                  placeholder="https://seusite.com.br"
+                />
+              </div>
             </div>
           </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="youtube">
-                📹 YouTube
-              </label>
-              <input
-                type="url"
-                id="youtube"
-                name="youtube"
-                value={formData.social_media.youtube || ''}
-                onChange={handleSocialMediaChange}
-                placeholder="https://youtube.com/@seu-canal"
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="website">
-                🌐 Website / Portfólio
-              </label>
-              <input
-                type="url"
-                id="website"
-                name="website"
-                value={formData.social_media.website || ''}
-                onChange={handleSocialMediaChange}
-                placeholder="https://seusite.com.br"
-              />
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* LOCALIZAÇÃO */}
         <div className="profile-section">
@@ -1030,32 +1199,36 @@ const Profile = () => {
             </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="business_address">Endereço Comercial</label>
-            <input
-              type="text"
-              id="business_address"
-              name="business_address"
-              value={formData.business_address}
-              onChange={handleChange}
-              placeholder="Rua, número, bairro..."
-            />
-          </div>
+          {(isProfessional || isCompany) && (
+            <>
+              <div className="form-group">
+                <label htmlFor="business_address">Endereço {isCompany ? 'da Empresa' : 'Comercial'}</label>
+                <input
+                  type="text"
+                  id="business_address"
+                  name="business_address"
+                  value={formData.business_address}
+                  onChange={handleChange}
+                  placeholder="Rua, número, bairro..."
+                />
+              </div>
 
-          <div className="form-group">
-            <label htmlFor="google_maps_link">Link do Google Maps</label>
-            <input
-              type="url"
-              id="google_maps_link"
-              name="google_maps_link"
-              value={formData.google_maps_link}
-              onChange={handleChange}
-              placeholder="https://maps.google.com/..."
-            />
-            <p className="help-text">
-              Cole o link do Google Maps para facilitar que clientes encontrem você
-            </p>
-          </div>
+              <div className="form-group">
+                <label htmlFor="google_maps_link">Link do Google Maps</label>
+                <input
+                  type="url"
+                  id="google_maps_link"
+                  name="google_maps_link"
+                  value={formData.google_maps_link}
+                  onChange={handleChange}
+                  placeholder="https://maps.google.com/..."
+                />
+                <p className="help-text">
+                  Cole o link do Google Maps para facilitar que clientes encontrem você
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
         {/* BOTÃO DE SALVAR */}
@@ -1066,8 +1239,8 @@ const Profile = () => {
         </div>
       </form>
 
-      {/* MODAL DE PORTFOLIO (mantido igual) */}
-      {showPortfolioModal && (
+      {/* MODAL DE PORTFOLIO (apenas para profissionais) */}
+      {isProfessional && showPortfolioModal && (
         <div className="modal-overlay" onClick={closePortfolioModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">

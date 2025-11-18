@@ -1,467 +1,611 @@
-// backend/src/controllers/authController.js - REFATORADO E CLEAN
+// backend/src/controllers/authController.js - VERSÃO CORRIGIDA COMPLETA
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import db from '../models/index.js';
 import crypto from 'crypto';
 
-// ========================================
-// 🔧 FUNÇÕES AUXILIARES
-// ========================================
+const { User, Professional } = db;
 
-const validateDocument = (doc, type) => {
-  const numbers = doc.replace(/[^\d]+/g, '');
-  
-  if (type === 'cpf') {
-    if (numbers.length !== 11 || /^(\d)\1{10}$/.test(numbers)) return false;
-    
-    for (let j = 0; j < 2; j++) {
-      let sum = 0;
-      const length = 9 + j;
-      for (let i = 0; i < length; i++) {
-        sum += parseInt(numbers.charAt(i)) * ((length + 1) - i);
-      }
-      const remainder = (sum * 10) % 11;
-      const digit = remainder === 10 || remainder === 11 ? 0 : remainder;
-      if (digit !== parseInt(numbers.charAt(length))) return false;
-    }
-    return true;
-  }
-  
-  if (type === 'cnpj') {
-    if (numbers.length !== 14 || /^(\d)\1{13}$/.test(numbers)) return false;
-    
-    for (let j = 0; j < 2; j++) {
-      let sum = 0;
-      const length = 12 + j;
-      let pos = length - 7;
-      for (let i = length; i >= 1; i--) {
-        sum += numbers.charAt(length - i) * pos--;
-        if (pos < 2) pos = 9;
-      }
-      const result = sum % 11 < 2 ? 0 : 11 - sum % 11;
-      if (result !== parseInt(numbers.charAt(length))) return false;
-    }
-    return true;
-  }
-  
-  return false;
-};
-
-const processUserData = (userType, data) => {
-  const { cpf, cnpj, phone, clientPhone, city, clientCity, state, clientState, documento } = data;
-  
-  const config = {
-    professional: {
-      documento: cpf?.replace(/\D/g, ''),
-      phone: null,
+// ============================================
+// REGISTER
+// ============================================
+export const register = async (req, res) => {
+  try {
+    const { 
+      name, 
+      email, 
+      password, 
+      confirmPassword,
+      userType,
+      cpf,
+      cnpj,
+      documento,
+      category_id,
       city,
-      state
-    },
-    company: {
-      documento: cnpj?.replace(/\D/g, ''),
-      phone: phone?.replace(/\D/g, ''),
-      city,
-      state
-    },
-    client: {
-      documento: documento?.replace(/\D/g, '') || null,
-      phone: clientPhone?.replace(/\D/g, '') || null,
-      city: clientCity || null,
-      state: clientState?.toUpperCase() || null
-    }
-  };
-  
-  return config[userType] || config.client;
-};
+      state,
+      description,
+      experience,
+      education,
+      phone,
+      companyName,
+      clientPhone,
+      clientCity,
+      clientState
+    } = req.body;
 
-const validateUserType = (userType, data) => {
-  const validators = {
-    professional: () => {
-      const { cpf, category_id, city, state, description, experience, education } = data;
-      
-      if (!cpf) return { error: 'CPF é obrigatório para profissionais' };
-      if (!validateDocument(cpf, 'cpf')) return { error: 'CPF inválido' };
-      if (!category_id) return { error: 'Categoria é obrigatória para profissionais' };
-      if (!city || !state) return { error: 'Cidade e estado são obrigatórios para profissionais' };
-      if (!description || !experience || !education) {
-        return { error: 'Descrição, experiência e formação são obrigatórios para profissionais' };
+    console.log('📝 Dados recebidos:', { name, email, userType });
+
+    if (!name || !email || !password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nome, email e senha são obrigatórios'
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'As senhas não coincidem'
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'A senha deve ter pelo menos 6 caracteres'
+      });
+    }
+
+    if (userType === 'professional') {
+      if (!cpf || !category_id || !city || !state || !description || !experience || !education) {
+        return res.status(400).json({
+          success: false,
+          error: 'Preencha todos os campos obrigatórios do profissional'
+        });
       }
-      return null;
-    },
-    
-    company: () => {
-      const { companyName, cnpj, phone } = data;
-      
-      if (!companyName) return { error: 'Nome da empresa é obrigatório' };
-      if (!cnpj) return { error: 'CNPJ é obrigatório para empresas' };
-      if (!validateDocument(cnpj, 'cnpj')) return { error: 'CNPJ inválido' };
-      if (!phone) return { error: 'Telefone é obrigatório para empresas' };
-      return null;
-    },
-    
-    client: () => {
-      const { documento, clientPhone, clientCity, clientState } = data;
-      
-      console.log('👤 Validando cliente final');
-      if (!documento) return { error: 'CPF é obrigatório para clientes' };
-      if (!validateDocument(documento, 'cpf')) return { error: 'CPF inválido' };
-      if (!clientPhone) return { error: 'Telefone é obrigatório para clientes' };
-      if (!clientCity) return { error: 'Cidade é obrigatória para clientes' };
-      if (!clientState) return { error: 'Estado é obrigatório para clientes' };
-      return null;
     }
-  };
-  
-  return validators[userType] ? validators[userType]() : null;
-};
 
-const createUserProfile = async (userType, userId, data) => {
-  const profiles = {
-    professional: async () => {
-      const { name, email, category_id, city, state, description, experience, education, subcategories } = data;
-      
-      console.log('🔨 Criando perfil profissional...');
-      const professional = await db.Professional.create({
-        id: `prof-${Date.now()}`,
-        user_id: userId,
-        name,
-        email,
+    if (userType === 'company') {
+      if (!companyName || !cnpj || !phone) {
+        return res.status(400).json({
+          success: false,
+          error: 'Nome da empresa, CNPJ e telefone são obrigatórios'
+        });
+      }
+    }
+
+    const existingUser = await User.findOne({ where: { email: email.toLowerCase() } });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        error: 'Este email já está cadastrado'
+      });
+    }
+
+    const userData = {
+      name: companyName || name,
+      email: email.toLowerCase().trim(),
+      password: password,
+      documento: cpf || cnpj || documento || null,
+      user_type: userType || 'client',
+      phone: phone || clientPhone || null,
+      city: city || clientCity || null,
+      state: state || clientState || null,
+      description: description || null,
+      experience: experience || null,
+      education: education || null,
+      is_active: true,
+      email_verified: false
+    };
+
+    console.log('💾 Criando usuário:', { name: userData.name, email: userData.email, type: userData.user_type });
+
+    const newUser = await User.create(userData);
+
+    console.log('✅ Usuário criado:', { id: newUser.id, type: newUser.user_type });
+
+    if (userType === 'professional' && category_id) {
+      await Professional.create({
+        id: newUser.id,
+        user_id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
         category_id,
         city,
         state,
         description,
         experience,
         education,
+        phone: phone || null,
         is_active: true
       });
-      
-      if (subcategories?.length > 0) {
-        const subcategoryObjects = await db.Subcategory.findAll({ where: { id: subcategories } });
-        await professional.setSubcategories(subcategoryObjects);
-        console.log('✅ Subcategorias associadas');
+      console.log('✅ Perfil profissional criado');
+    }
+
+    const token = newUser.generateToken();
+    const userResponse = newUser.toJSON();
+    delete userResponse.password;
+
+    return res.status(201).json({
+      success: true,
+      message: 'Conta criada com sucesso!',
+      data: {
+        user: userResponse,
+        token
       }
-      
-      console.log('✅ Profissional criado:', professional.id);
-    },
-    
-    company: async () => {
-      const { companyName, email, website, businessAreas } = data;
-      const { documento, phone, city, state } = processUserData('company', data);
-      
-      console.log('🏢 Criando perfil de empresa...');
-      await db.Company.create({
-        user_id: userId,
-        company_name: companyName,
-        cnpj: documento,
-        website,
-        email,
-        phone,
-        city,
-        state,
-        business_areas: businessAreas || []
-      });
-      console.log('✅ Empresa criada');
-    },
-    
-    client: async () => {
-      console.log('👤 Cliente final criado - sem perfil adicional');
-      const { documento, phone, city, state } = processUserData('client', data);
-      console.log('📋 Dados salvos:', {
-        documento: documento ? 'SIM' : 'NÃO',
-        phone: phone ? 'SIM' : 'NÃO',
-        city: city || 'NÃO',
-        state: state || 'NÃO'
-      });
-    }
-  };
-  
-  return profiles[userType] ? await profiles[userType]() : null;
-};
-
-// ========================================
-// 📝 REGISTRO
-// ========================================
-
-export const register = async (req, res) => {
-  try {
-    const { name, email, password, confirmPassword, userType = 'professional' } = req.body;
-
-    // Validações básicas
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Dados obrigatórios', message: 'Nome, email e senha são obrigatórios' });
-    }
-    if (password !== confirmPassword) {
-      return res.status(400).json({ error: 'Senhas não coincidem' });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Senha muito fraca', message: 'A senha deve ter pelo menos 6 caracteres' });
-    }
-
-    // Validações específicas por tipo
-    const validationError = validateUserType(userType, req.body);
-    if (validationError) {
-      return res.status(400).json(validationError);
-    }
-
-    // Processar dados do usuário
-    const { documento, phone, city, state } = processUserData(userType, req.body);
-
-    // Verificar duplicatas
-    const whereConditions = [{ email }];
-    if (documento) whereConditions.push({ documento });
-
-    const existingUser = await db.User.findOne({ where: { [db.Sequelize.Op.or]: whereConditions } });
-    
-    if (existingUser) {
-      if (existingUser.email === email) return res.status(409).json({ error: 'Email já cadastrado' });
-      if (existingUser.documento === documento) {
-        const errorMsg = userType === 'professional' ? 'CPF já cadastrado' : 
-                        userType === 'company' ? 'CNPJ já cadastrado' : 'Documento já cadastrado';
-        return res.status(409).json({ error: errorMsg });
-      }
-    }
-
-    // Criar usuário
-    const user = await db.User.create({
-      name,
-      email,
-      password,
-      documento,
-      user_type: userType,
-      phone,
-      city,
-      state,
-      email_verification_token: crypto.randomBytes(32).toString('hex')
     });
 
-    console.log('✅ Usuário criado:', user.id);
-
-    // Criar perfil específico
-    await createUserProfile(userType, user.id, req.body);
-
-    // Resposta
-    const token = user.generateToken();
-    const userData = user.toJSON();
-    delete userData.password;
-    delete userData.email_verification_token;
-    delete userData.documento;
-
-    console.log('🎉 Registro completado com sucesso!');
-    res.status(201).json({ message: 'Usuário criado com sucesso', user: userData, token });
-
   } catch (error) {
-    console.error('❌ Erro ao registrar usuário:', error);
-    
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      const field = error.errors[0]?.path;
-      if (field === 'email') return res.status(409).json({ error: 'Email já cadastrado' });
-      if (field === 'documento') return res.status(409).json({ error: 'CPF/CNPJ/Documento já cadastrado' });
-    }
-    
-    res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+    console.error('💥 Erro no registro:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro interno do servidor',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
-// ========================================
-// 🔐 DEMAIS FUNÇÕES
-// ========================================
-
+// ============================================
+// LOGIN
+// ============================================
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+      return res.status(400).json({
+        success: false,
+        error: 'Email e senha são obrigatórios'
+      });
     }
 
-    const user = await db.User.findOne({ 
-      where: { email },
-      include: [
-        { model: db.Professional, as: 'professionalProfile', required: false },
-        { model: db.Company, as: 'companyProfile', required: false }
-      ]
+    const user = await User.findOne({ 
+      where: { email: email.toLowerCase() }
     });
 
-    if (!user) return res.status(401).json({ error: 'Credenciais inválidas' });
-    if (!user.is_active) return res.status(401).json({ error: 'Conta desativada', message: 'Entre em contato com o suporte' });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Email ou senha incorretos'
+      });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({
+        success: false,
+        error: 'Sua conta está desativada'
+      });
+    }
 
     const isValidPassword = await user.validatePassword(password);
-    if (!isValidPassword) return res.status(401).json({ error: 'Credenciais inválidas' });
+
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        error: 'Email ou senha incorretos'
+      });
+    }
 
     const token = user.generateToken();
-    const userData = user.toJSON();
-    delete userData.password;
-    delete userData.email_verification_token;
-    delete userData.reset_password_token;
-    delete userData.reset_password_expires;
-    delete userData.documento;
+    const userResponse = user.toJSON();
+    delete userResponse.password;
 
-    res.json({ message: 'Login realizado com sucesso', user: userData, token });
-  } catch (error) {
-    console.error('Erro no login:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-};
-
-export const getProfile = async (req, res) => {
-  try {
-    const user = await db.User.findByPk(req.user.id, {
-      attributes: { exclude: ['password', 'email_verification_token', 'reset_password_token', 'documento'] },
-      include: [
-        {
-          model: db.Professional,
-          as: 'professionalProfile',
-          required: false,
-          include: [
-            { model: db.Category, as: 'category' },
-            { model: db.City, as: 'cityRelation' },
-            { model: db.Subcategory, as: 'subcategories' }
-          ]
-        },
-        {
-          model: db.Company,
-          as: 'companyProfile',
-          required: false,
-          include: [{ model: db.City, as: 'cityRelation' }]
-        }
-      ]
+    return res.json({
+      success: true,
+      data: {
+        user: userResponse,
+        token
+      }
     });
 
-    res.json({ user });
   } catch (error) {
-    console.error('Erro ao buscar perfil:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    console.error('💥 Erro no login:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro interno do servidor'
+    });
   }
 };
 
+// ============================================
+// GET PROFILE
+// ============================================
+export const getProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findByPk(userId, {
+      attributes: { exclude: ['password'] }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuário não encontrado'
+      });
+    }
+
+    if (user.user_type === 'professional') {
+      const professional = await Professional.findOne({
+        where: { user_id: userId }
+      });
+
+      if (professional) {
+        const profileData = {
+          ...user.toJSON(),
+          category_id: professional.category_id,
+          description: professional.description || user.description,
+          experience: professional.experience || user.experience,
+          education: professional.education || user.education,
+          whatsapp: professional.whatsapp,
+          business_address: professional.business_address,
+          google_maps_link: professional.google_maps_link,
+          social_media: professional.social_media,
+          profile_photo: professional.profile_photo || user.profile_photo
+        };
+
+        return res.json({
+          success: true,
+          data: profileData
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: user
+    });
+
+  } catch (error) {
+    console.error('💥 Erro ao buscar perfil:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao buscar perfil'
+    });
+  }
+};
+
+// ============================================
+// UPDATE PROFILE - ✅ COM LÓGICA DE ATIVAR/DESATIVAR
+// ============================================
 export const updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    const updates = req.body;
+    const updates = { ...req.body };
 
     delete updates.id;
-    delete updates.user_type;
-    delete updates.email_verified;
+    delete updates.password;
+    delete updates.email;
     delete updates.created_at;
     delete updates.updated_at;
-    delete updates.documento;
 
-    if (updates.password) {
-      if (!updates.currentPassword) {
-        return res.status(400).json({ error: 'Senha atual é obrigatória para alteração' });
-      }
+    console.log('📝 Atualizando perfil:', { userId, updates });
 
-      const user = await db.User.findByPk(userId);
-      const isValidPassword = await user.validatePassword(updates.currentPassword);
-      
-      if (!isValidPassword) {
-        return res.status(400).json({ error: 'Senha atual incorreta' });
-      }
+    const user = await User.findByPk(userId);
 
-      delete updates.currentPassword;
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuário não encontrado'
+      });
     }
 
-    await db.User.update(updates, { where: { id: userId } });
-    const updatedUser = await db.User.findByPk(userId, {
-      attributes: { exclude: ['password', 'email_verification_token', 'documento'] }
+    const oldUserType = user.user_type;
+    const newUserType = updates.user_type;
+
+    // ===== MUDANÇA DE TIPO DE USUÁRIO =====
+    if (newUserType && newUserType !== oldUserType) {
+      console.log(`🔄 Mudando tipo de ${oldUserType} para ${newUserType}`);
+      
+      const professional = await Professional.findOne({ where: { user_id: userId } });
+      
+      // ✅ CASO 1: Mudando PARA professional ou company
+      if (newUserType === 'professional' || newUserType === 'company') {
+        if (!professional) {
+          await Professional.create({
+            id: userId,
+            user_id: userId,
+            name: user.name,
+            email: user.email,
+            category_id: updates.category_id || null,
+            city: updates.city || user.city,
+            state: updates.state || user.state,
+            description: updates.description || '',
+            experience: updates.experience || '',
+            education: updates.education || '',
+            phone: updates.phone || user.phone,
+            is_active: true
+          });
+          console.log('✅ Perfil profissional criado');
+        } else {
+          await professional.update({ is_active: true });
+          console.log('✅ Perfil profissional REATIVADO');
+        }
+      }
+      
+      // ✅ CASO 2: Mudando PARA client
+      else if (newUserType === 'client') {
+        if (professional) {
+          await professional.update({ is_active: false });
+          console.log('✅ Perfil profissional DESATIVADO (mudou para client)');
+        }
+      }
+    }
+
+    // ===== ATUALIZA O USER =====
+    await user.update(updates);
+
+    // ===== SE FOR PROFISSIONAL OU COMPANY, ATUALIZA PROFESSIONAL =====
+    if (user.user_type === 'professional' || user.user_type === 'company') {
+      const professional = await Professional.findOne({ where: { user_id: userId } });
+      
+      if (professional) {
+        const professionalUpdates = {};
+        
+        if (updates.name) professionalUpdates.name = updates.name;
+        if (updates.category_id) professionalUpdates.category_id = updates.category_id;
+        if (updates.city) professionalUpdates.city = updates.city;
+        if (updates.state) professionalUpdates.state = updates.state;
+        if (updates.description) professionalUpdates.description = updates.description;
+        if (updates.experience) professionalUpdates.experience = updates.experience;
+        if (updates.education) professionalUpdates.education = updates.education;
+        if (updates.phone) professionalUpdates.phone = updates.phone;
+        if (updates.whatsapp) professionalUpdates.whatsapp = updates.whatsapp;
+        if (updates.business_address) professionalUpdates.business_address = updates.business_address;
+        if (updates.google_maps_link) professionalUpdates.google_maps_link = updates.google_maps_link;
+        if (updates.social_media) professionalUpdates.social_media = updates.social_media;
+        if (updates.profile_photo) professionalUpdates.profile_photo = updates.profile_photo;
+
+        professionalUpdates.is_active = true;
+
+        await professional.update(professionalUpdates);
+        console.log('✅ Professional atualizado');
+      }
+    }
+
+    const updatedUser = await User.findByPk(userId, {
+      attributes: { exclude: ['password'] }
     });
 
-    res.json({ message: 'Perfil atualizado com sucesso', user: updatedUser });
+    return res.json({
+      success: true,
+      message: 'Perfil atualizado com sucesso',
+      data: updatedUser
+    });
+
   } catch (error) {
-    console.error('Erro ao atualizar perfil:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    console.error('💥 Erro ao atualizar perfil:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro interno do servidor',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
+// ============================================
+// LOGOUT
+// ============================================
 export const logout = async (req, res) => {
   try {
-    res.json({ message: 'Logout realizado com sucesso' });
-  } catch (error) {
-    console.error('Erro no logout:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-};
-
-export const verifyToken = async (req, res) => {
-  try {
-    res.json({
-      valid: true,
-      user: { id: req.user.id, name: req.user.name, email: req.user.email, userType: req.user.user_type }
+    return res.json({
+      success: true,
+      message: 'Logout realizado com sucesso'
     });
   } catch (error) {
-    res.status(401).json({ valid: false, error: 'Token inválido' });
+    console.error('💥 Erro no logout:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao fazer logout'
+    });
   }
 };
 
-// ========================================
-// 🔑 RECUPERAÇÃO DE SENHA
-// ========================================
+// ============================================
+// VERIFY TOKEN
+// ============================================
+export const verifyToken = async (req, res) => {
+  try {
+    const userId = req.user.id;
 
+    const user = await User.findByPk(userId, {
+      attributes: ['id', 'name', 'email', 'user_type', 'profile_photo', 'is_active']
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuário não encontrado'
+      });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({
+        success: false,
+        error: 'Conta desativada'
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: { user }
+    });
+
+  } catch (error) {
+    console.error('💥 Erro ao verificar token:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao verificar token'
+    });
+  }
+};
+
+// ============================================
+// FORGOT PASSWORD
+// ============================================
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email é obrigatório' });
 
-    const user = await db.User.findOne({ where: { email } });
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email é obrigatório'
+      });
+    }
+
+    const user = await User.findOne({ where: { email: email.toLowerCase() } });
+
     if (!user) {
-      return res.json({ success: true, message: 'Se o email existir, você receberá o código de recuperação' });
+      return res.json({
+        success: true,
+        message: 'Se o email existir, você receberá um código de recuperação'
+      });
     }
 
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+    const resetExpires = new Date(Date.now() + 30 * 60 * 1000);
 
-    await user.update({ reset_password_token: resetCode, reset_password_expires: expiresAt });
+    await user.update({
+      reset_password_token: resetCode,
+      reset_password_expires: resetExpires
+    });
 
-    console.log(`🔑 Código de recuperação gerado para ${email}: ${resetCode}`);
-    res.json({ success: true, message: 'Código de recuperação gerado', resetCode, email });
+    console.log('📧 Código de recuperação:', resetCode, 'para', user.email);
+
+    return res.json({
+      success: true,
+      message: 'Código de recuperação enviado para seu email',
+      ...(process.env.NODE_ENV === 'development' && { resetCode })
+    });
+
   } catch (error) {
-    console.error('Erro ao gerar código de recuperação:', error);
-    res.status(500).json({ error: 'Erro ao processar solicitação', details: error.message });
+    console.error('💥 Erro ao solicitar recuperação:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao processar solicitação'
+    });
   }
 };
 
+// ============================================
+// VERIFY RESET CODE
+// ============================================
 export const verifyResetCode = async (req, res) => {
   try {
     const { email, code } = req.body;
-    if (!email || !code) return res.status(400).json({ error: 'Email e código são obrigatórios' });
 
-    const user = await db.User.findOne({ where: { email } });
-    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
-    if (user.reset_password_token !== code) return res.status(400).json({ error: 'Código inválido' });
-    if (new Date() > new Date(user.reset_password_expires)) {
-      return res.status(400).json({ error: 'Código expirado. Solicite um novo código.' });
+    if (!email || !code) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email e código são obrigatórios'
+      });
     }
 
-    res.json({ success: true, message: 'Código válido' });
+    const user = await User.findOne({ where: { email: email.toLowerCase() } });
+
+    if (!user || !user.reset_password_token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Código inválido ou expirado'
+      });
+    }
+
+    if (new Date() > user.reset_password_expires) {
+      return res.status(400).json({
+        success: false,
+        error: 'Código expirado. Solicite um novo código.'
+      });
+    }
+
+    if (user.reset_password_token !== code) {
+      return res.status(400).json({
+        success: false,
+        error: 'Código incorreto'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Código válido'
+    });
+
   } catch (error) {
-    console.error('Erro ao verificar código:', error);
-    res.status(500).json({ error: 'Erro ao verificar código', details: error.message });
+    console.error('💥 Erro ao verificar código:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao verificar código'
+    });
   }
 };
 
+// ============================================
+// RESET PASSWORD
+// ============================================
 export const resetPassword = async (req, res) => {
   try {
-    const { email, code, newPassword } = req.body;
+    const { email, code, newPassword, confirmPassword } = req.body;
 
-    if (!email || !code || !newPassword) {
-      return res.status(400).json({ error: 'Email, código e nova senha são obrigatórios' });
+    if (!email || !code || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Todos os campos são obrigatórios'
+      });
     }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'As senhas não coincidem'
+      });
+    }
+
     if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres' });
+      return res.status(400).json({
+        success: false,
+        error: 'A senha deve ter pelo menos 6 caracteres'
+      });
     }
 
-    const user = await db.User.findOne({ where: { email } });
-    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
-    if (user.reset_password_token !== code) return res.status(400).json({ error: 'Código inválido' });
-    if (new Date() > new Date(user.reset_password_expires)) {
-      return res.status(400).json({ error: 'Código expirado. Solicite um novo código.' });
+    const user = await User.findOne({ where: { email: email.toLowerCase() } });
+
+    if (!user || !user.reset_password_token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Código inválido ou expirado'
+      });
     }
 
-    await user.update({ password: newPassword, reset_password_token: null, reset_password_expires: null });
+    if (new Date() > user.reset_password_expires) {
+      return res.status(400).json({
+        success: false,
+        error: 'Código expirado'
+      });
+    }
 
-    console.log(`✅ Senha resetada com sucesso para: ${email}`);
-    res.json({ success: true, message: 'Senha alterada com sucesso' });
+    if (user.reset_password_token !== code) {
+      return res.status(400).json({
+        success: false,
+        error: 'Código incorreto'
+      });
+    }
+
+    await user.update({
+      password: newPassword,
+      reset_password_token: null,
+      reset_password_expires: null
+    });
+
+    return res.json({
+      success: true,
+      message: 'Senha redefinida com sucesso'
+    });
+
   } catch (error) {
-    console.error('Erro ao resetar senha:', error);
-    res.status(500).json({ error: 'Erro ao resetar senha', details: error.message });
+    console.error('💥 Erro ao redefinir senha:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao redefinir senha'
+    });
   }
 };
