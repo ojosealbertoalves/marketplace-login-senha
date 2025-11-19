@@ -870,123 +870,152 @@ const Profile = () => {
       <form onSubmit={handleSubmit} className="profile-form">
         
         {/* INFORMAÇÕES PESSOAIS */}
-        <div className="profile-section">
-          <h2>👤 Informações {isCompany ? 'da Empresa' : 'Pessoais'}</h2>
-          
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="name">
-                {isCompany ? 'Nome do Responsável' : 'Nome Completo'} *
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                placeholder={isCompany ? "Nome do responsável" : "Seu nome completo"}
-              />
-            </div>
+       
 
-            <div className="form-group">
-              <label htmlFor="email">Email *</label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                placeholder="seu@email.com"
-              />
-            </div>
-          </div>
+<div className="profile-section">
+  <h2>👤 Informações {isCompany ? 'da Empresa' : 'Pessoais'}</h2>
+  
+  <div className="form-row">
+    <div className="form-group">
+      <label htmlFor="name">
+        {isCompany ? 'Nome do Responsável' : 'Nome Completo'} *
+      </label>
+      <input
+        type="text"
+        id="name"
+        name="name"
+        value={formData.name}
+        onChange={handleChange}
+        required
+        placeholder={isCompany ? "Nome do responsável" : "Seu nome completo"}
+      />
+    </div>
 
-          {isCompany && (
-            <div className="form-group">
-              <label htmlFor="company_name">Nome da Empresa *</label>
-              <input
-                type="text"
-                id="company_name"
-                name="company_name"
-                value={formData.company_name}
-                onChange={handleChange}
-                placeholder="Nome fantasia ou razão social"
-              />
-            </div>
-          )}
+    <div className="form-group">
+      <label htmlFor="email">Email *</label>
+      <input
+        type="email"
+        id="email"
+        name="email"
+        value={formData.email}
+        onChange={handleChange}
+        required
+        placeholder="seu@email.com"
+      />
+    </div>
+  </div>
 
-          <div className="form-row">
-            {isProfessional && (
-              <div className="form-group">
-                <label htmlFor="cpf">CPF</label>
-                <input
-                  type="text"
-                  id="cpf"
-                  name="cpf"
-                  value={formData.cpf}
-                  onChange={handleChange}
-                  placeholder="000.000.000-00"
-                />
-              </div>
-            )}
+  {isCompany && (
+    <div className="form-group">
+      <label htmlFor="company_name">Nome da Empresa *</label>
+      <input
+        type="text"
+        id="company_name"
+        name="company_name"
+        value={formData.company_name}
+        onChange={handleChange}
+        placeholder="Nome fantasia ou razão social"
+      />
+    </div>
+  )}
 
-            {isCompany && (
-              <div className="form-group">
-                <label htmlFor="cnpj">CNPJ</label>
-                <input
-                  type="text"
-                  id="cnpj"
-                  name="cnpj"
-                  value={formData.cnpj}
-                  onChange={handleChange}
-                  placeholder="00.000.000/0000-00"
-                />
-              </div>
-            )}
+  <div className="form-row">
+    {/* ✅ CPF/CNPJ/DOCUMENTO - SOMENTE LEITURA */}
+    {isProfessional && formData.cpf && (
+      <div className="form-group">
+        <label htmlFor="cpf">CPF</label>
+        <input
+          type="text"
+          id="cpf"
+          name="cpf"
+          value={formData.cpf}
+          readOnly
+          className="readonly-input"
+          style={{
+            backgroundColor: '#f3f4f6',
+            cursor: 'not-allowed',
+            color: '#6b7280'
+          }}
+        />
+        <p className="help-text" style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+          ℹ️ CPF não pode ser alterado
+        </p>
+      </div>
+    )}
 
-            {isClient && (
-              <div className="form-group">
-                <label htmlFor="documento">CPF/CNPJ</label>
-                <input
-                  type="text"
-                  id="documento"
-                  name="documento"
-                  value={formData.documento}
-                  onChange={handleChange}
-                  placeholder="Seu documento"
-                />
-              </div>
-            )}
+    {isCompany && formData.cnpj && (
+      <div className="form-group">
+        <label htmlFor="cnpj">CNPJ</label>
+        <input
+          type="text"
+          id="cnpj"
+          name="cnpj"
+          value={formData.cnpj}
+          readOnly
+          className="readonly-input"
+          style={{
+            backgroundColor: '#f3f4f6',
+            cursor: 'not-allowed',
+            color: '#6b7280'
+          }}
+        />
+        <p className="help-text" style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+          ℹ️ CNPJ não pode ser alterado
+        </p>
+      </div>
+    )}
 
-            <div className="form-group">
-              <label htmlFor="phone">Telefone</label>
-              <input
-                type="tel"
-                id="phone"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="(00) 00000-0000"
-              />
-            </div>
-          </div>
+    {isClient && formData.documento && (
+      <div className="form-group">
+        <label htmlFor="documento">CPF/CNPJ</label>
+        <input
+          type="text"
+          id="documento"
+          name="documento"
+          value={formData.documento}
+          readOnly
+          className="readonly-input"
+          style={{
+            backgroundColor: '#f3f4f6',
+            cursor: 'not-allowed',
+            color: '#6b7280'
+          }}
+        />
+        <p className="help-text" style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+          ℹ️ Documento não pode ser alterado
+        </p>
+      </div>
+    )}
 
-          {isProfessional && (
-            <div className="form-group">
-              <label htmlFor="whatsapp">WhatsApp</label>
-              <input
-                type="tel"
-                id="whatsapp"
-                name="whatsapp"
-                value={formData.whatsapp}
-                onChange={handleChange}
-                placeholder="(00) 00000-0000"
-              />
-            </div>
-          )}
-        </div>
+    <div className="form-group">
+      <label htmlFor="phone">Telefone</label>
+      <input
+        type="tel"
+        id="phone"
+        name="phone"
+        value={formData.phone}
+        onChange={handleChange}
+        placeholder="(00) 00000-0000"
+      />
+    </div>
+  </div>
+
+  {isProfessional && (
+    <div className="form-group">
+      <label htmlFor="whatsapp">WhatsApp</label>
+      <input
+        type="tel"
+        id="whatsapp"
+        name="whatsapp"
+        value={formData.whatsapp}
+        onChange={handleChange}
+        placeholder="(00) 00000-0000"
+      />
+    </div>
+  )}
+</div>
+
+
 
         {/* CATEGORIA E ESPECIALIDADES (APENAS PROFISSIONAL) */}
         {isProfessional && (

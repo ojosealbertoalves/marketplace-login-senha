@@ -8,6 +8,7 @@ import { useFilters } from '../hooks/useFilters';
 import { useAuth } from '../contexts/AuthContext';
 import Filters from '../components/Filters';
 import ProfessionalCard from '../components/ProfessionalCard';
+import Footer from '../components/Footer'; // ✅ IMPORTAR O FOOTER
 
 const Home = () => {
   const navigate = useNavigate();
@@ -105,6 +106,9 @@ const Home = () => {
           ))}
         </div>
       </main>
+      
+      {/* ✅ FOOTER NO SKELETON */}
+      <Footer />
     </div>
   );
 
@@ -121,10 +125,10 @@ const Home = () => {
           <div className="container py-6">
             <div className="text-center">
               <h1 className="text-3xl font-bold text-white mb-2">
-                🏗️ Marketplace da Construção Civil
+                🏗️ ConstruGO
               </h1>
               <p className="text-gray-200 max-w-2xl mx-auto">
-                Encontre os melhores profissionais da construção civil da sua região.
+                Melhor catálogo de profissionais da construção civil do estado de Goiás
               </p>
             </div>
           </div>
@@ -146,6 +150,9 @@ const Home = () => {
             </div>
           </div>
         </main>
+        
+        {/* ✅ FOOTER NO ERROR STATE */}
+        <Footer />
       </div>
     );
   }
@@ -158,11 +165,10 @@ const Home = () => {
           <div className="flex justify-between items-center">
             <div className="text-center flex-1">
               <h1 className="text-3xl font-bold text-white mb-2">
-                🏗️ Marketplace da Construção Civil
+                🏗️ ConstruGO
               </h1>
               <p className="text-gray-200 max-w-2xl mx-auto">
-                Encontre os melhores profissionais da construção civil da sua região. 
-                Conectamos você com especialistas qualificados e experientes.
+                Melhor catálogo de profissionais da construção civil do estado de Goiás
               </p>
             </div>
             
@@ -268,6 +274,9 @@ const Home = () => {
           )}
         </section>
       </main>
+
+      {/* ✅ FOOTER PRINCIPAL */}
+      <Footer />
     </div>
   );
 };

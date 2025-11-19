@@ -1,7 +1,7 @@
 // frontend/src/components/Footer.jsx
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Phone, MapPin, ExternalLink } from 'lucide-react';
+import { Mail, Phone, MapPin } from 'lucide-react';
 import './Footer.css';
 
 const Footer = () => {
@@ -16,23 +16,23 @@ const Footer = () => {
           <div className="footer-section">
             <div className="footer-logo">
               <span className="logo-icon">🏗️</span>
-              <span className="logo-text">CatálogoPro</span>
+              <span className="logo-text">ConstruGO</span>
             </div>
             <p className="footer-description">
-              A maior plataforma de profissionais da construção civil do Brasil. 
+              Melhor catálogo de profissionais da construção civil do estado de Goiás. 
               Conectando clientes e profissionais especializados com qualidade e confiança.
             </p>
             <div className="footer-social">
-              <a href="#" className="social-icon" aria-label="Facebook">
+              <a href="#" className="social-icon" aria-label="Facebook" title="Facebook">
                 📘
               </a>
-              <a href="#" className="social-icon" aria-label="Instagram">
+              <a href="#" className="social-icon" aria-label="Instagram" title="Instagram">
                 📷
               </a>
-              <a href="#" className="social-icon" aria-label="LinkedIn">
+              <a href="#" className="social-icon" aria-label="LinkedIn" title="LinkedIn">
                 💼
               </a>
-              <a href="#" className="social-icon" aria-label="YouTube">
+              <a href="#" className="social-icon" aria-label="YouTube" title="YouTube">
                 📺
               </a>
             </div>
@@ -71,7 +71,7 @@ const Footer = () => {
             <ul className="footer-links">
               <li>
                 <Link to="/?category=1" className="footer-link">
-                  Obras e Reformas
+                  Pedreiros e Serventes
                 </Link>
               </li>
               <li>
@@ -81,12 +81,12 @@ const Footer = () => {
               </li>
               <li>
                 <Link to="/?category=3" className="footer-link">
-                  Elétrica
+                  Eletricistas
                 </Link>
               </li>
               <li>
                 <Link to="/?category=4" className="footer-link">
-                  Hidráulica
+                  Encanadores
                 </Link>
               </li>
             </ul>
@@ -98,15 +98,15 @@ const Footer = () => {
             <div className="footer-contact">
               <div className="contact-item">
                 <Mail size={16} />
-                <span>contato@catalogopro.com.br</span>
+                <span>contato@construgo.com.br</span>
               </div>
               <div className="contact-item">
                 <Phone size={16} />
-                <span>(11) 99999-9999</span>
+                <span>(62) 99999-9999</span>
               </div>
               <div className="contact-item">
                 <MapPin size={16} />
-                <span>São Paulo, SP - Brasil</span>
+                <span>Goiânia, GO - Brasil</span>
               </div>
             </div>
           </div>
@@ -118,7 +118,7 @@ const Footer = () => {
         {/* Rodapé inferior */}
         <div className="footer-bottom">
           <div className="footer-bottom-left">
-            <p>&copy; {currentYear} CatálogoPro. Todos os direitos reservados.</p>
+            <p>&copy; {currentYear} ConstruGO. Todos os direitos reservados.</p>
           </div>
           <div className="footer-bottom-right">
             <Link to="/termos" className="footer-legal-link">
@@ -127,8 +127,8 @@ const Footer = () => {
             <Link to="/privacidade" className="footer-legal-link">
               Política de Privacidade
             </Link>
-            <Link to="/suporte" className="footer-legal-link">
-              Suporte
+            <Link to="/lgpd" className="footer-legal-link">
+              LGPD
             </Link>
           </div>
         </div>

@@ -1,8 +1,9 @@
-// frontend/src/pages/Register.jsx - COM CAMPOS CLIENTE FINAL
+// frontend/src/pages/Register.jsx - COM DROPDOWNS DE LOCALIDADE
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Building, Eye, EyeOff, AlertCircle, UserCircle } from 'lucide-react';
 import { register } from '../services/api';
+import { states, getCitiesByState } from '../data/locations';
 import './Register.css';
 
 function Register() {
@@ -15,6 +16,10 @@ function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // ✅ Estados para cidades disponíveis
+  const [availableCities, setAvailableCities] = useState([]);
+  const [availableClientCities, setAvailableClientCities] = useState([]);
+
   const [formData, setFormData] = useState({
     name: '', email: '', password: '', confirmPassword: '',
     // Profissional
@@ -26,31 +31,58 @@ function Register() {
   });
 
   useEffect(() => {
-  fetch('http://localhost:3001/api/categories')
-    .then(res => res.json())
-    .then(data => {
-      // ✅ CORREÇÃO: Verifica se data é array ou objeto
-      const categoriesArray = Array.isArray(data) ? data : (data.data || []);
-      console.log('📋 Categorias carregadas:', categoriesArray); // Debug
-      setCategories(categoriesArray);
-    })
-    .catch(err => console.error('Erro ao carregar categorias:', err));
-}, []);
-
-useEffect(() => {
-  if (formData.categoryId) {
-    fetch(`http://localhost:3001/api/subcategories?category_id=${formData.categoryId}`)
+    fetch('http://localhost:3001/api/categories')
       .then(res => res.json())
       .then(data => {
-        // ✅ CORREÇÃO: Verifica se data é array ou objeto
-        const subcategoriesArray = Array.isArray(data) ? data : (data.data || []);
-        console.log('📋 Subcategorias carregadas:', subcategoriesArray); // Debug
-        setSubcategories(subcategoriesArray);
+        const categoriesArray = Array.isArray(data) ? data : (data.data || []);
+        console.log('📋 Categorias carregadas:', categoriesArray);
+        setCategories(categoriesArray);
       })
-      .catch(err => console.error('Erro ao carregar subcategorias:', err));
-  }
-}, [formData.categoryId]);
+      .catch(err => console.error('Erro ao carregar categorias:', err));
+  }, []);
 
+  useEffect(() => {
+    if (formData.categoryId) {
+      fetch(`http://localhost:3001/api/subcategories?category_id=${formData.categoryId}`)
+        .then(res => res.json())
+        .then(data => {
+          const subcategoriesArray = Array.isArray(data) ? data : (data.data || []);
+          console.log('📋 Subcategorias carregadas:', subcategoriesArray);
+          setSubcategories(subcategoriesArray);
+        })
+        .catch(err => console.error('Erro ao carregar subcategorias:', err));
+    }
+  }, [formData.categoryId]);
+
+  // ✅ Atualizar cidades quando o estado mudar (PROFISSIONAL)
+  useEffect(() => {
+    if (formData.state) {
+      const cities = getCitiesByState(formData.state);
+      setAvailableCities(cities);
+      
+      // Se a cidade atual não existe no novo estado, limpa
+      if (!cities.find(c => c.value === formData.city)) {
+        setFormData(prev => ({ ...prev, city: '' }));
+      }
+    } else {
+      setAvailableCities([]);
+    }
+  }, [formData.state]);
+
+  // ✅ Atualizar cidades quando o estado mudar (CLIENTE)
+  useEffect(() => {
+    if (formData.clientState) {
+      const cities = getCitiesByState(formData.clientState);
+      setAvailableClientCities(cities);
+      
+      // Se a cidade atual não existe no novo estado, limpa
+      if (!cities.find(c => c.value === formData.clientCity)) {
+        setFormData(prev => ({ ...prev, clientCity: '' }));
+      }
+    } else {
+      setAvailableClientCities([]);
+    }
+  }, [formData.clientState]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -84,8 +116,8 @@ useEffect(() => {
       if (!formData.cpf.trim()) newErrors.cpf = 'CPF é obrigatório';
       else if (formData.cpf.replace(/\D/g, '').length !== 11) newErrors.cpf = 'CPF deve ter 11 dígitos';
       if (!formData.categoryId) newErrors.categoryId = 'Categoria é obrigatória';
-      if (!formData.city.trim()) newErrors.city = 'Cidade é obrigatória';
       if (!formData.state.trim()) newErrors.state = 'Estado é obrigatório';
+      if (!formData.city.trim()) newErrors.city = 'Cidade é obrigatória';
       if (!formData.description.trim()) newErrors.description = 'Descrição dos serviços é obrigatória';
       if (!formData.experience.trim()) newErrors.experience = 'Experiência é obrigatória';
       if (!formData.education.trim()) newErrors.education = 'Formação é obrigatória';
@@ -260,16 +292,47 @@ useEffect(() => {
                 {errors.categoryId && <span className="error-message">{errors.categoryId}</span>}
               </div>
 
+              {/* ✅ DROPDOWNS DE ESTADO E CIDADE */}
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="city" className="form-label">Cidade</label>
-                  <input type="text" id="city" name="city" value={formData.city} onChange={handleChange} className={`form-input ${errors.city ? 'error' : ''}`} placeholder="Sua cidade" />
-                  {errors.city && <span className="error-message">{errors.city}</span>}
-                </div>
-                <div className="form-group">
                   <label htmlFor="state" className="form-label">Estado</label>
-                  <input type="text" id="state" name="state" value={formData.state} onChange={handleChange} className={`form-input ${errors.state ? 'error' : ''}`} placeholder="UF" maxLength="2" />
+                  <select 
+                    id="state" 
+                    name="state" 
+                    value={formData.state} 
+                    onChange={handleChange} 
+                    className={`form-input ${errors.state ? 'error' : ''}`}
+                  >
+                    <option value="">Selecione o estado</option>
+                    {states.map(state => (
+                      <option key={state.value} value={state.value}>
+                        {state.label}
+                      </option>
+                    ))}
+                  </select>
                   {errors.state && <span className="error-message">{errors.state}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="city" className="form-label">Cidade</label>
+                  <select 
+                    id="city" 
+                    name="city" 
+                    value={formData.city} 
+                    onChange={handleChange} 
+                    className={`form-input ${errors.city ? 'error' : ''}`}
+                    disabled={!formData.state}
+                  >
+                    <option value="">
+                      {formData.state ? 'Selecione a cidade' : 'Selecione o estado primeiro'}
+                    </option>
+                    {availableCities.map(city => (
+                      <option key={city.value} value={city.value}>
+                        {city.label}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.city && <span className="error-message">{errors.city}</span>}
                 </div>
               </div>
 
@@ -337,14 +400,45 @@ useEffect(() => {
                 <input type="text" id="clientPhone" name="clientPhone" value={formData.clientPhone} onChange={handleFormatChange('clientPhone', formatters.phone)} className="form-input" placeholder="(00) 00000-0000" maxLength="15" />
               </div>
 
+              {/* ✅ DROPDOWNS DE ESTADO E CIDADE PARA CLIENTE */}
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="clientCity" className="form-label">Cidade</label>
-                  <input type="text" id="clientCity" name="clientCity" value={formData.clientCity} onChange={handleChange} className="form-input" placeholder="Sua cidade" />
-                </div>
-                <div className="form-group">
                   <label htmlFor="clientState" className="form-label">Estado</label>
-                  <input type="text" id="clientState" name="clientState" value={formData.clientState} onChange={handleChange} className="form-input" placeholder="UF" maxLength="2" />
+                  <select 
+                    id="clientState" 
+                    name="clientState" 
+                    value={formData.clientState} 
+                    onChange={handleChange} 
+                    className="form-input"
+                  >
+                    <option value="">Selecione o estado</option>
+                    {states.map(state => (
+                      <option key={state.value} value={state.value}>
+                        {state.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="clientCity" className="form-label">Cidade</label>
+                  <select 
+                    id="clientCity" 
+                    name="clientCity" 
+                    value={formData.clientCity} 
+                    onChange={handleChange} 
+                    className="form-input"
+                    disabled={!formData.clientState}
+                  >
+                    <option value="">
+                      {formData.clientState ? 'Selecione a cidade' : 'Selecione o estado primeiro'}
+                    </option>
+                    {availableClientCities.map(city => (
+                      <option key={city.value} value={city.value}>
+                        {city.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

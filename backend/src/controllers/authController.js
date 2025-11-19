@@ -1,8 +1,9 @@
-// backend/src/controllers/authController.js - VERSÃO CORRIGIDA COMPLETA
+// backend/src/controllers/authController.js - VERSÃO COMPLETA COM EMAIL
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../models/index.js';
 import crypto from 'crypto';
+import { sendPasswordResetEmail } from '../services/emailService.js';
 
 const { User, Professional } = db;
 
@@ -266,7 +267,7 @@ export const getProfile = async (req, res) => {
 };
 
 // ============================================
-// UPDATE PROFILE - ✅ COM LÓGICA DE ATIVAR/DESATIVAR
+// UPDATE PROFILE
 // ============================================
 export const updateProfile = async (req, res) => {
   try {
@@ -293,13 +294,11 @@ export const updateProfile = async (req, res) => {
     const oldUserType = user.user_type;
     const newUserType = updates.user_type;
 
-    // ===== MUDANÇA DE TIPO DE USUÁRIO =====
     if (newUserType && newUserType !== oldUserType) {
       console.log(`🔄 Mudando tipo de ${oldUserType} para ${newUserType}`);
       
       const professional = await Professional.findOne({ where: { user_id: userId } });
       
-      // ✅ CASO 1: Mudando PARA professional ou company
       if (newUserType === 'professional' || newUserType === 'company') {
         if (!professional) {
           await Professional.create({
@@ -323,7 +322,6 @@ export const updateProfile = async (req, res) => {
         }
       }
       
-      // ✅ CASO 2: Mudando PARA client
       else if (newUserType === 'client') {
         if (professional) {
           await professional.update({ is_active: false });
@@ -332,10 +330,8 @@ export const updateProfile = async (req, res) => {
       }
     }
 
-    // ===== ATUALIZA O USER =====
     await user.update(updates);
 
-    // ===== SE FOR PROFISSIONAL OU COMPANY, ATUALIZA PROFESSIONAL =====
     if (user.user_type === 'professional' || user.user_type === 'company') {
       const professional = await Professional.findOne({ where: { user_id: userId } });
       
@@ -441,7 +437,7 @@ export const verifyToken = async (req, res) => {
 };
 
 // ============================================
-// FORGOT PASSWORD
+// FORGOT PASSWORD - ✅ COM ENVIO DE EMAIL
 // ============================================
 export const forgotPassword = async (req, res) => {
   try {
@@ -471,12 +467,22 @@ export const forgotPassword = async (req, res) => {
       reset_password_expires: resetExpires
     });
 
-    console.log('📧 Código de recuperação:', resetCode, 'para', user.email);
+    // ✅ ENVIAR EMAIL
+    try {
+      await sendPasswordResetEmail(user.email, resetCode, user.name);
+      console.log('✅ Email de recuperação enviado para:', user.email);
+    } catch (emailError) {
+      console.error('❌ Erro ao enviar email:', emailError);
+      return res.json({
+        success: true,
+        message: 'Houve um problema ao enviar o email. Tente novamente em alguns instantes.'
+      });
+    }
 
+    // ✅ NUNCA RETORNA O CÓDIGO NA RESPOSTA
     return res.json({
       success: true,
-      message: 'Código de recuperação enviado para seu email',
-      ...(process.env.NODE_ENV === 'development' && { resetCode })
+      message: 'Código de recuperação enviado para seu email'
     });
 
   } catch (error) {

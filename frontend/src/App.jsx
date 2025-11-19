@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import Profile from './pages/Profile';
+import ComoFunciona from './pages/ComoFunciona';
 import './App.css';
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
           <Route path="/cadastro" element={<Register />} />
           <Route path="/esqueci-senha" element={<ForgotPassword />} />
           <Route path="/perfil" element={<Profile />} />
+          <Route path="/como-funciona" element={<ComoFunciona />} />
         </Routes>
       </main>
     </div>

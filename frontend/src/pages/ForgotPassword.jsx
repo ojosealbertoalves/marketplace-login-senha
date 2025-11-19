@@ -52,12 +52,11 @@ function ForgotPassword() {
       const data = await response.json();
 
       if (response.ok) {
-        // Guardar o código que veio do backend
-        setResetCode(data.resetCode);
+        // ✅ Agora o código NÃO vem mais na resposta
         setStep(2);
-        setSuccessMessage('Código gerado com sucesso!');
+        setSuccessMessage('Código enviado para seu email!');
       } else {
-        setErrors({ submit: data.error || 'Erro ao gerar código' });
+        setErrors({ submit: data.error || 'Erro ao enviar código' });
       }
     } catch (error) {
       console.error('Erro:', error);
@@ -138,7 +137,8 @@ function ForgotPassword() {
         body: JSON.stringify({ 
           email: formData.email,
           code: formData.code,
-          newPassword: formData.newPassword
+          newPassword: formData.newPassword,
+          confirmPassword: formData.confirmPassword // ✅ ADICIONADO!
         })
       });
 
@@ -188,7 +188,7 @@ function ForgotPassword() {
           
           <p className="forgot-password-subtitle">
             {step === 1 && 'Digite seu email para receber o código de recuperação'}
-            {step === 2 && 'Digite o código de 6 dígitos que foi gerado'}
+            {step === 2 && 'Digite o código de 6 dígitos enviado para seu email'}
             {step === 3 && 'Defina sua nova senha'}
           </p>
         </div>
@@ -244,7 +244,7 @@ function ForgotPassword() {
               className="submit-button"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Gerando código...' : 'Gerar Código'}
+              {isSubmitting ? 'Enviando código...' : 'Enviar Código'}
             </button>
           </form>
         )}
@@ -252,21 +252,14 @@ function ForgotPassword() {
         {/* PASSO 2: Código */}
         {step === 2 && (
           <>
-            {/* Mostrar o código gerado */}
-            <div className="code-display">
-              <p className="code-label">Seu código de recuperação:</p>
-              <div className="code-box">
-                <span className="code-value">{resetCode}</span>
-                <button 
-                  type="button" 
-                  className="copy-button"
-                  onClick={copyCode}
-                  title="Copiar código"
-                >
-                  <Copy size={18} />
-                </button>
-              </div>
-              <p className="code-hint">⚠️ Este código expira em 15 minutos</p>
+            {/* ✅ REMOVIDO O DISPLAY DO CÓDIGO - agora só vem por email */}
+            <div className="code-instructions">
+              <p className="code-hint">
+                📧 Verifique seu email e digite o código de 6 dígitos que você recebeu.
+              </p>
+              <p className="code-hint-secondary">
+                ⚠️ O código expira em 30 minutos
+              </p>
             </div>
 
             <form onSubmit={handleVerifyCode} className="forgot-password-form">
@@ -300,9 +293,13 @@ function ForgotPassword() {
               <button 
                 type="button"
                 className="back-step-button"
-                onClick={() => setStep(1)}
+                onClick={() => {
+                  setStep(1);
+                  setFormData(prev => ({ ...prev, code: '' }));
+                  setSuccessMessage('');
+                }}
               >
-                Gerar novo código
+                Enviar novo código
               </button>
             </form>
           </>

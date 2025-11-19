@@ -27,7 +27,7 @@ const Header = () => {
           {/* Logo */}
           <Link to="/" className="logo">
             <span className="logo-icon">🏗️</span>
-            <span className="logo-text">CatálogoPro</span>
+            <span className="logo-text">ConstruGO</span>
           </Link>
 
           {/* Menu Desktop */}
