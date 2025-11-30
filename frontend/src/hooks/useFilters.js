@@ -1,4 +1,4 @@
-// frontend/src/hooks/useFilters.js - CORRIGIDO DEFINITIVO
+// frontend/src/hooks/useFilters.js - CORRIGIDO SIMPLES
 import { useState, useMemo } from 'react';
 
 export const useFilters = (professionals = [], categories = []) => {
@@ -10,7 +10,6 @@ export const useFilters = (professionals = [], categories = []) => {
     city: ''
   });
 
-  // Garantir que os dados sejam arrays
   const safeProfessionals = useMemo(() => {
     if (!professionals) return [];
     if (Array.isArray(professionals)) return professionals;
@@ -29,9 +28,7 @@ export const useFilters = (professionals = [], categories = []) => {
     setFilters(prev => ({
       ...prev,
       [key]: value,
-      // Limpar subcategoria quando categoria muda
       ...(key === 'category' && { subcategory: '' }),
-      // Limpar cidade quando estado muda
       ...(key === 'state' && { city: '' })
     }));
   };
@@ -48,13 +45,28 @@ export const useFilters = (professionals = [], categories = []) => {
 
   // Profissionais filtrados
   const filteredProfessionals = useMemo(() => {
+    // 🔍 DEBUG - REMOVER DEPOIS
+    console.log('🔍 DEBUG FILTROS:', {
+      filters,
+      totalProfessionals: safeProfessionals.length,
+      primeiroProfissional: safeProfessionals[0]
+    });
+    
     return safeProfessionals.filter(professional => {
+      // 🔍 DEBUG - REMOVER DEPOIS
+      if (filters.category) {
+        console.log('🔍 Comparando:', {
+          professional_category_id: professional.category_id,
+          filters_category: filters.category,
+          match: professional.category_id === filters.category
+        });
+      }
+      
       // Filtro de busca
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         const matchesName = professional.name?.toLowerCase().includes(searchLower);
         
-        // ✅ CORRIGIDO: category pode ser objeto ou string
         const categoryName = typeof professional.category === 'object' 
           ? professional.category?.name 
           : professional.category;
@@ -67,32 +79,19 @@ export const useFilters = (professionals = [], categories = []) => {
         }
       }
 
-      // Filtro de categoria
+      // ✅ FILTRO DE CATEGORIA SIMPLIFICADO
       if (filters.category) {
-        // Buscar categoria pelo ID selecionado
-        const selectedCategory = safeCategories.find(cat => cat.id === filters.category);
-        
-        if (!selectedCategory) return false;
-        
-        // ✅ CORRIGIDO: Comparar category_id OU nome da categoria
-        const matchesById = professional.category_id === filters.category;
-        
-        const categoryName = typeof professional.category === 'object'
-          ? professional.category?.name
-          : professional.category;
-        const matchesByName = categoryName === selectedCategory.name;
-        
-        if (!matchesById && !matchesByName) return false;
+        if (professional.category_id !== filters.category) {
+          return false;
+        }
       }
 
       // Filtro de subcategoria
       if (filters.subcategory) {
-        // Verificar se o professional tem essa subcategoria
         if (!professional.subcategories || !Array.isArray(professional.subcategories)) {
           return false;
         }
         
-        // Verificar se a subcategoria está no array (pode ser string ou objeto)
         const hasSubcategory = professional.subcategories.some(sub => {
           if (typeof sub === 'string') {
             return sub === filters.subcategory;
@@ -115,7 +114,7 @@ export const useFilters = (professionals = [], categories = []) => {
 
       return true;
     });
-  }, [safeProfessionals, safeCategories, filters]);
+  }, [safeProfessionals, filters]);
 
   // Subcategorias disponíveis baseadas na categoria selecionada
   const availableSubcategories = useMemo(() => {

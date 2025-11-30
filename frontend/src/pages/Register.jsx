@@ -1,7 +1,7 @@
-// frontend/src/pages/Register.jsx - COM DROPDOWNS DE LOCALIDADE
+// frontend/src/pages/Register.jsx - SEM EMPRESA
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Building, Eye, EyeOff, AlertCircle, UserCircle } from 'lucide-react';
+import { User, Eye, EyeOff, AlertCircle, UserCircle } from 'lucide-react';
 import { register } from '../services/api';
 import { states, getCitiesByState } from '../data/locations';
 import './Register.css';
@@ -16,7 +16,6 @@ function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // ✅ Estados para cidades disponíveis
   const [availableCities, setAvailableCities] = useState([]);
   const [availableClientCities, setAvailableClientCities] = useState([]);
 
@@ -24,8 +23,6 @@ function Register() {
     name: '', email: '', password: '', confirmPassword: '',
     // Profissional
     cpf: '', categoryId: '', subcategoryIds: [], city: '', state: '', description: '', experience: '', education: '',
-    // Empresa
-    companyName: '', cnpj: '', website: '', phone: '',
     // Cliente Final
     documento: '', clientPhone: '', clientCity: '', clientState: ''
   });
@@ -54,13 +51,10 @@ function Register() {
     }
   }, [formData.categoryId]);
 
-  // ✅ Atualizar cidades quando o estado mudar (PROFISSIONAL)
   useEffect(() => {
     if (formData.state) {
       const cities = getCitiesByState(formData.state);
       setAvailableCities(cities);
-      
-      // Se a cidade atual não existe no novo estado, limpa
       if (!cities.find(c => c.value === formData.city)) {
         setFormData(prev => ({ ...prev, city: '' }));
       }
@@ -69,13 +63,10 @@ function Register() {
     }
   }, [formData.state]);
 
-  // ✅ Atualizar cidades quando o estado mudar (CLIENTE)
   useEffect(() => {
     if (formData.clientState) {
       const cities = getCitiesByState(formData.clientState);
       setAvailableClientCities(cities);
-      
-      // Se a cidade atual não existe no novo estado, limpa
       if (!cities.find(c => c.value === formData.clientCity)) {
         setFormData(prev => ({ ...prev, clientCity: '' }));
       }
@@ -92,7 +83,6 @@ function Register() {
 
   const formatters = {
     cpf: (v) => v.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'),
-    cnpj: (v) => v.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1/$2').replace(/(\d{4})(\d{1,2})$/, '$1-$2'),
     phone: (v) => v.replace(/\D/g, '').replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d{1,4})$/, '$1-$2')
   };
 
@@ -121,13 +111,6 @@ function Register() {
       if (!formData.description.trim()) newErrors.description = 'Descrição dos serviços é obrigatória';
       if (!formData.experience.trim()) newErrors.experience = 'Experiência é obrigatória';
       if (!formData.education.trim()) newErrors.education = 'Formação é obrigatória';
-    }
-
-    if (userType === 'company') {
-      if (!formData.companyName.trim()) newErrors.companyName = 'Nome da empresa é obrigatório';
-      if (!formData.cnpj.trim()) newErrors.cnpj = 'CNPJ é obrigatório';
-      else if (formData.cnpj.replace(/\D/g, '').length !== 14) newErrors.cnpj = 'CNPJ deve ter 14 dígitos';
-      if (!formData.phone.trim()) newErrors.phone = 'Telefone é obrigatório';
     }
 
     setErrors(newErrors);
@@ -159,15 +142,6 @@ function Register() {
           description: formData.description.trim(),
           experience: formData.experience.trim(),
           education: formData.education.trim()
-        });
-      }
-
-      if (userType === 'company') {
-        Object.assign(userData, {
-          companyName: formData.companyName.trim(),
-          cnpj: formData.cnpj.replace(/\D/g, ''),
-          website: formData.website.trim(),
-          phone: formData.phone.replace(/\D/g, '')
         });
       }
 
@@ -216,10 +190,6 @@ function Register() {
             <User size={20} />
             <span>Profissional</span>
           </button>
-          <button type="button" className={`type-button ${userType === 'company' ? 'active' : ''}`} onClick={() => setUserType('company')}>
-            <Building size={20} />
-            <span>Empresa</span>
-          </button>
           <button type="button" className={`type-button ${userType === 'client' ? 'active' : ''}`} onClick={() => setUserType('client')}>
             <UserCircle size={20} />
             <span>Cliente Final</span>
@@ -234,10 +204,9 @@ function Register() {
             </div>
           )}
 
-          {/* Campos básicos */}
           <div className="form-group">
             <label htmlFor="name" className="form-label">
-              {userType === 'professional' ? 'Nome Completo' : userType === 'company' ? 'Nome do Responsável' : 'Seu Nome'}
+              {userType === 'professional' ? 'Nome Completo' : 'Seu Nome'}
             </label>
             <div className="input-wrapper">
               <User className="input-icon" />
@@ -274,7 +243,6 @@ function Register() {
             {errors.confirmPassword && <span className="error-message">{errors.confirmPassword}</span>}
           </div>
 
-          {/* ========== PROFISSIONAL ========== */}
           {userType === 'professional' && (
             <>
               <div className="form-group">
@@ -292,22 +260,13 @@ function Register() {
                 {errors.categoryId && <span className="error-message">{errors.categoryId}</span>}
               </div>
 
-              {/* ✅ DROPDOWNS DE ESTADO E CIDADE */}
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="state" className="form-label">Estado</label>
-                  <select 
-                    id="state" 
-                    name="state" 
-                    value={formData.state} 
-                    onChange={handleChange} 
-                    className={`form-input ${errors.state ? 'error' : ''}`}
-                  >
+                  <select id="state" name="state" value={formData.state} onChange={handleChange} className={`form-input ${errors.state ? 'error' : ''}`}>
                     <option value="">Selecione o estado</option>
                     {states.map(state => (
-                      <option key={state.value} value={state.value}>
-                        {state.label}
-                      </option>
+                      <option key={state.value} value={state.value}>{state.label}</option>
                     ))}
                   </select>
                   {errors.state && <span className="error-message">{errors.state}</span>}
@@ -315,21 +274,10 @@ function Register() {
 
                 <div className="form-group">
                   <label htmlFor="city" className="form-label">Cidade</label>
-                  <select 
-                    id="city" 
-                    name="city" 
-                    value={formData.city} 
-                    onChange={handleChange} 
-                    className={`form-input ${errors.city ? 'error' : ''}`}
-                    disabled={!formData.state}
-                  >
-                    <option value="">
-                      {formData.state ? 'Selecione a cidade' : 'Selecione o estado primeiro'}
-                    </option>
+                  <select id="city" name="city" value={formData.city} onChange={handleChange} className={`form-input ${errors.city ? 'error' : ''}`} disabled={!formData.state}>
+                    <option value="">{formData.state ? 'Selecione a cidade' : 'Selecione o estado primeiro'}</option>
                     {availableCities.map(city => (
-                      <option key={city.value} value={city.value}>
-                        {city.label}
-                      </option>
+                      <option key={city.value} value={city.value}>{city.label}</option>
                     ))}
                   </select>
                   {errors.city && <span className="error-message">{errors.city}</span>}
@@ -356,38 +304,6 @@ function Register() {
             </>
           )}
 
-          {/* ========== EMPRESA ========== */}
-          {userType === 'company' && (
-            <>
-              <div className="form-group">
-                <label htmlFor="companyName" className="form-label">Nome da Empresa</label>
-                <div className="input-wrapper">
-                  <Building className="input-icon" />
-                  <input type="text" id="companyName" name="companyName" value={formData.companyName} onChange={handleChange} className={`form-input ${errors.companyName ? 'error' : ''}`} placeholder="Nome fantasia ou razão social" />
-                </div>
-                {errors.companyName && <span className="error-message">{errors.companyName}</span>}
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="cnpj" className="form-label">CNPJ</label>
-                <input type="text" id="cnpj" name="cnpj" value={formData.cnpj} onChange={handleFormatChange('cnpj', formatters.cnpj)} className={`form-input ${errors.cnpj ? 'error' : ''}`} placeholder="00.000.000/0000-00" maxLength="18" />
-                {errors.cnpj && <span className="error-message">{errors.cnpj}</span>}
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="phone" className="form-label">Telefone</label>
-                <input type="text" id="phone" name="phone" value={formData.phone} onChange={handleFormatChange('phone', formatters.phone)} className={`form-input ${errors.phone ? 'error' : ''}`} placeholder="(00) 00000-0000" maxLength="15" />
-                {errors.phone && <span className="error-message">{errors.phone}</span>}
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="website" className="form-label">Site (opcional)</label>
-                <input type="text" id="website" name="website" value={formData.website} onChange={handleChange} className="form-input" placeholder="www.suaempresa.com.br" />
-              </div>
-            </>
-          )}
-
-          {/* ========== CLIENTE FINAL ========== */}
           {userType === 'client' && (
             <>
               <div className="form-group">
@@ -400,43 +316,23 @@ function Register() {
                 <input type="text" id="clientPhone" name="clientPhone" value={formData.clientPhone} onChange={handleFormatChange('clientPhone', formatters.phone)} className="form-input" placeholder="(00) 00000-0000" maxLength="15" />
               </div>
 
-              {/* ✅ DROPDOWNS DE ESTADO E CIDADE PARA CLIENTE */}
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="clientState" className="form-label">Estado</label>
-                  <select 
-                    id="clientState" 
-                    name="clientState" 
-                    value={formData.clientState} 
-                    onChange={handleChange} 
-                    className="form-input"
-                  >
+                  <select id="clientState" name="clientState" value={formData.clientState} onChange={handleChange} className="form-input">
                     <option value="">Selecione o estado</option>
                     {states.map(state => (
-                      <option key={state.value} value={state.value}>
-                        {state.label}
-                      </option>
+                      <option key={state.value} value={state.value}>{state.label}</option>
                     ))}
                   </select>
                 </div>
 
                 <div className="form-group">
                   <label htmlFor="clientCity" className="form-label">Cidade</label>
-                  <select 
-                    id="clientCity" 
-                    name="clientCity" 
-                    value={formData.clientCity} 
-                    onChange={handleChange} 
-                    className="form-input"
-                    disabled={!formData.clientState}
-                  >
-                    <option value="">
-                      {formData.clientState ? 'Selecione a cidade' : 'Selecione o estado primeiro'}
-                    </option>
+                  <select id="clientCity" name="clientCity" value={formData.clientCity} onChange={handleChange} className="form-input" disabled={!formData.clientState}>
+                    <option value="">{formData.clientState ? 'Selecione a cidade' : 'Selecione o estado primeiro'}</option>
                     {availableClientCities.map(city => (
-                      <option key={city.value} value={city.value}>
-                        {city.label}
-                      </option>
+                      <option key={city.value} value={city.value}>{city.label}</option>
                     ))}
                   </select>
                 </div>
@@ -446,7 +342,7 @@ function Register() {
                 <AlertCircle size={20} />
                 <div>
                   <strong>Conta de Cliente Final</strong>
-                  <p>Como cliente, você poderá visualizar todos os profissionais e empresas, acessar informações de contato, mas seu perfil não aparecerá nas buscas.</p>
+                  <p>Como cliente, você poderá visualizar todos os profissionais, acessar informações de contato, mas seu perfil não aparecerá nas buscas.</p>
                 </div>
               </div>
             </>

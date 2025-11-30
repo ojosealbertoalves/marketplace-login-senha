@@ -1,15 +1,12 @@
-// backend/src/controllers/authController.js - VERSÃO COMPLETA COM EMAIL
+// backend/src/controllers/authController.js
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../models/index.js';
 import crypto from 'crypto';
 import { sendPasswordResetEmail } from '../services/emailService.js';
 
-const { User, Professional } = db;
+const { User, Professional, Company } = db;
 
-// ============================================
-// REGISTER
-// ============================================
 export const register = async (req, res) => {
   try {
     const { 
@@ -107,7 +104,7 @@ export const register = async (req, res) => {
 
     if (userType === 'professional' && category_id) {
       await Professional.create({
-        id: newUser.id,
+        id: `prof-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         user_id: newUser.id,
         name: newUser.name,
         email: newUser.email,
@@ -121,6 +118,22 @@ export const register = async (req, res) => {
         is_active: true
       });
       console.log('✅ Perfil profissional criado');
+    }
+
+    if (userType === 'company') {
+      await Company.create({
+        id: `comp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        user_id: newUser.id,
+        company_name: companyName,
+        cnpj: cnpj || null,
+        phone: phone || null,
+        email: newUser.email,
+        description: description || null,
+        city_id: null,
+        state: clientState || null,
+        is_active: true
+      });
+      console.log('✅ Perfil de empresa criado');
     }
 
     const token = newUser.generateToken();
@@ -146,9 +159,6 @@ export const register = async (req, res) => {
   }
 };
 
-// ============================================
-// LOGIN
-// ============================================
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -208,9 +218,6 @@ export const login = async (req, res) => {
   }
 };
 
-// ============================================
-// GET PROFILE
-// ============================================
 export const getProfile = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -228,13 +235,29 @@ export const getProfile = async (req, res) => {
 
     if (user.user_type === 'professional') {
       const professional = await Professional.findOne({
-        where: { user_id: userId }
+        where: { user_id: userId },
+        include: [
+          {
+            model: db.Subcategory,
+            as: 'subcategories',
+            through: { attributes: [] },
+            attributes: ['id', 'name']
+          }
+        ]
       });
 
       if (professional) {
+        console.log('📋 Professional encontrado:', {
+          id: professional.id,
+          user_id: professional.user_id,
+          subcategories: professional.subcategories?.length || 0
+        });
+        
         const profileData = {
           ...user.toJSON(),
+          professional_id: professional.id,
           category_id: professional.category_id,
+          subcategories: professional.subcategories || [],
           description: professional.description || user.description,
           experience: professional.experience || user.experience,
           education: professional.education || user.education,
@@ -243,6 +266,52 @@ export const getProfile = async (req, res) => {
           google_maps_link: professional.google_maps_link,
           social_media: professional.social_media,
           profile_photo: professional.profile_photo || user.profile_photo
+        };
+
+        return res.json({
+          success: true,
+          data: profileData
+        });
+      }
+    }
+
+    if (user.user_type === 'company') {
+      const company = await Company.findOne({
+        where: { user_id: userId },
+        include: [
+          {
+            model: db.Category,
+            as: 'category',
+            attributes: ['id', 'name']
+          },
+          {
+            model: db.Subcategory,
+            as: 'subcategories',
+            through: { attributes: [] },
+            attributes: ['id', 'name']
+          }
+        ]
+      });
+
+      if (company) {
+        const profileData = {
+          ...user.toJSON(),
+          company_name: company.company_name,
+          cnpj: company.cnpj,
+          category_id: company.category_id,
+          category: company.category,
+          subcategories: company.subcategories || [],
+          description: company.description || user.description,
+          website: company.website,
+          logo: company.logo,
+          phone: company.phone || user.phone,
+          whatsapp: company.whatsapp,
+          address: company.address,
+          city_id: company.city_id,
+          state: company.state || user.state,
+          business_areas: company.business_areas,
+          social_media: company.social_media,
+          profile_photo: company.logo || user.profile_photo
         };
 
         return res.json({
@@ -266,9 +335,6 @@ export const getProfile = async (req, res) => {
   }
 };
 
-// ============================================
-// UPDATE PROFILE
-// ============================================
 export const updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -280,7 +346,9 @@ export const updateProfile = async (req, res) => {
     delete updates.created_at;
     delete updates.updated_at;
 
-    console.log('📝 Atualizando perfil:', { userId, updates });
+    console.log('📝 Atualizando perfil:', { userId });
+    console.log('📦 Updates recebidos:', updates);
+    console.log('🏷️ Subcategories no body:', updates.subcategories);
 
     const user = await User.findByPk(userId);
 
@@ -298,11 +366,12 @@ export const updateProfile = async (req, res) => {
       console.log(`🔄 Mudando tipo de ${oldUserType} para ${newUserType}`);
       
       const professional = await Professional.findOne({ where: { user_id: userId } });
+      const company = await Company.findOne({ where: { user_id: userId } });
       
-      if (newUserType === 'professional' || newUserType === 'company') {
+      if (newUserType === 'professional') {
         if (!professional) {
           await Professional.create({
-            id: userId,
+            id: `prof-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             user_id: userId,
             name: user.name,
             email: user.email,
@@ -317,8 +386,43 @@ export const updateProfile = async (req, res) => {
           });
           console.log('✅ Perfil profissional criado');
         } else {
-          await professional.update({ is_active: true });
-          console.log('✅ Perfil profissional REATIVADO');
+          await professional.update({ 
+            is_active: true,
+            category_id: updates.category_id || professional.category_id
+          });
+          console.log('✅ Perfil profissional REATIVADO com category_id:', updates.category_id);
+        }
+        
+        if (company) {
+          await company.update({ is_active: false });
+          console.log('✅ Perfil de empresa DESATIVADO');
+        }
+      }
+      
+      else if (newUserType === 'company') {
+        if (!company) {
+          await Company.create({
+            id: `comp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            user_id: userId,
+            company_name: updates.company_name || user.name,
+            cnpj: (updates.cnpj && updates.cnpj !== '') ? updates.cnpj : null,
+            phone: (updates.phone && updates.phone !== '') ? updates.phone : (user.phone && user.phone !== '') ? user.phone : null,
+            email: user.email,
+            description: (updates.description && updates.description !== '') ? updates.description : null,
+            category_id: (updates.category_id && updates.category_id !== '') ? updates.category_id : null,
+            city_id: null,
+            state: (updates.state && updates.state !== '') ? updates.state : (user.state && user.state !== '') ? user.state : null,
+            is_active: true
+          });
+          console.log('✅ Perfil de empresa criado');
+        } else {
+          await company.update({ is_active: true });
+          console.log('✅ Perfil de empresa REATIVADO');
+        }
+        
+        if (professional) {
+          await professional.update({ is_active: false });
+          console.log('✅ Perfil profissional DESATIVADO');
         }
       }
       
@@ -327,28 +431,34 @@ export const updateProfile = async (req, res) => {
           await professional.update({ is_active: false });
           console.log('✅ Perfil profissional DESATIVADO (mudou para client)');
         }
+        if (company) {
+          await company.update({ is_active: false });
+          console.log('✅ Perfil de empresa DESATIVADO (mudou para client)');
+        }
       }
     }
 
     await user.update(updates);
 
-    if (user.user_type === 'professional' || user.user_type === 'company') {
+    if (user.user_type === 'professional') {
       const professional = await Professional.findOne({ where: { user_id: userId } });
       
       if (professional) {
+        console.log('👷 Professional encontrado:', professional.id);
+        
         const professionalUpdates = {};
         
         if (updates.name) professionalUpdates.name = updates.name;
-        if (updates.category_id) professionalUpdates.category_id = updates.category_id;
+        if ('category_id' in updates) professionalUpdates.category_id = updates.category_id;
         if (updates.city) professionalUpdates.city = updates.city;
         if (updates.state) professionalUpdates.state = updates.state;
-        if (updates.description) professionalUpdates.description = updates.description;
-        if (updates.experience) professionalUpdates.experience = updates.experience;
-        if (updates.education) professionalUpdates.education = updates.education;
+        if (updates.description !== undefined) professionalUpdates.description = updates.description;
+        if (updates.experience !== undefined) professionalUpdates.experience = updates.experience;
+        if (updates.education !== undefined) professionalUpdates.education = updates.education;
         if (updates.phone) professionalUpdates.phone = updates.phone;
-        if (updates.whatsapp) professionalUpdates.whatsapp = updates.whatsapp;
-        if (updates.business_address) professionalUpdates.business_address = updates.business_address;
-        if (updates.google_maps_link) professionalUpdates.google_maps_link = updates.google_maps_link;
+        if (updates.whatsapp !== undefined) professionalUpdates.whatsapp = updates.whatsapp;
+        if (updates.business_address !== undefined) professionalUpdates.business_address = updates.business_address;
+        if (updates.google_maps_link !== undefined) professionalUpdates.google_maps_link = updates.google_maps_link;
         if (updates.social_media) professionalUpdates.social_media = updates.social_media;
         if (updates.profile_photo) professionalUpdates.profile_photo = updates.profile_photo;
 
@@ -356,21 +466,127 @@ export const updateProfile = async (req, res) => {
 
         await professional.update(professionalUpdates);
         console.log('✅ Professional atualizado');
+
+        // ✅ ATUALIZAR SUBCATEGORIAS
+        if (updates.subcategories !== undefined) {
+          console.log('🏷️ Processando subcategorias...');
+          console.log('🏷️ Subcategories recebidas:', updates.subcategories);
+          console.log('🏷️ Tipo:', typeof updates.subcategories);
+          console.log('🏷️ É array?', Array.isArray(updates.subcategories));
+          
+          if (Array.isArray(updates.subcategories)) {
+            if (updates.subcategories.length === 0) {
+              await professional.setSubcategories([]);
+              console.log('✅ Subcategorias LIMPAS (array vazio)');
+            } else {
+              console.log('🔍 Buscando subcategorias com IDs:', updates.subcategories);
+              
+              const subcategoryRecords = await db.Subcategory.findAll({
+                where: { id: { [db.Sequelize.Op.in]: updates.subcategories } }
+              });
+              
+              console.log('📋 Subcategorias encontradas no banco:', subcategoryRecords.length);
+              console.log('📋 IDs encontrados:', subcategoryRecords.map(s => s.id));
+              
+              await professional.setSubcategories(subcategoryRecords);
+              console.log('✅ Subcategorias do profissional SETADAS:', updates.subcategories);
+              
+              // ✅ VERIFICAR SE SALVOU
+              const verification = await Professional.findByPk(professional.id, {
+                include: [{
+                  model: db.Subcategory,
+                  as: 'subcategories',
+                  attributes: ['id', 'name']
+                }]
+              });
+              
+              console.log('🔍 VERIFICAÇÃO - Subcategorias salvas:', verification.subcategories.map(s => s.id));
+            }
+          }
+        }
       }
     }
 
-    const updatedUser = await User.findByPk(userId, {
-      attributes: { exclude: ['password'] }
-    });
+    if (user.user_type === 'company') {
+      const company = await Company.findOne({ where: { user_id: userId } });
+      
+      if (company) {
+        const companyUpdates = {};
+        
+        if (updates.company_name) companyUpdates.company_name = updates.company_name;
+        if (updates.cnpj) companyUpdates.cnpj = updates.cnpj;
+        if (updates.description) companyUpdates.description = updates.description;
+        if (updates.website) companyUpdates.website = updates.website;
+        if (updates.logo) companyUpdates.logo = updates.logo;
+        if (updates.phone) companyUpdates.phone = updates.phone;
+        if (updates.whatsapp) companyUpdates.whatsapp = updates.whatsapp;
+        if (updates.address) companyUpdates.address = updates.address;
+        if (updates.city_id && updates.city_id !== '') companyUpdates.city_id = updates.city_id;
+        if (updates.state && updates.state !== '') companyUpdates.state = updates.state;
+        if (updates.category_id) companyUpdates.category_id = updates.category_id;
+        if (updates.business_areas) companyUpdates.business_areas = updates.business_areas;
+        if (updates.social_media) companyUpdates.social_media = updates.social_media;
+
+        companyUpdates.is_active = true;
+
+        await company.update(companyUpdates);
+        console.log('✅ Company atualizado');
+
+        if (updates.subcategories && Array.isArray(updates.subcategories)) {
+          const subcategoryRecords = await db.Subcategory.findAll({
+            where: { id: { [db.Sequelize.Op.in]: updates.subcategories } }
+          });
+          await company.setSubcategories(subcategoryRecords);
+          console.log('✅ Subcategorias da empresa atualizadas');
+        }
+      }
+    }
+
+    // ✅ RETORNAR DADOS COMPLETOS COM SUBCATEGORIAS
+    let updatedUserData;
+    
+    if (user.user_type === 'professional') {
+      const professional = await Professional.findOne({
+        where: { user_id: userId },
+        include: [{
+          model: db.Subcategory,
+          as: 'subcategories',
+          through: { attributes: [] },
+          attributes: ['id', 'name']
+        }]
+      });
+      
+      updatedUserData = {
+        ...user.toJSON(),
+        professional_id: professional.id,
+        category_id: professional.category_id,
+        subcategories: professional.subcategories || [],
+        description: professional.description,
+        experience: professional.experience,
+        education: professional.education,
+        whatsapp: professional.whatsapp,
+        business_address: professional.business_address,
+        google_maps_link: professional.google_maps_link,
+        social_media: professional.social_media,
+        profile_photo: professional.profile_photo || user.profile_photo
+      };
+      
+      console.log('📤 Retornando dados com', updatedUserData.subcategories.length, 'subcategorias');
+    } else {
+      updatedUserData = await User.findByPk(userId, {
+        attributes: { exclude: ['password'] }
+      });
+    }
 
     return res.json({
       success: true,
       message: 'Perfil atualizado com sucesso',
-      data: updatedUser
+      data: updatedUserData
     });
 
   } catch (error) {
     console.error('💥 Erro ao atualizar perfil:', error);
+    console.error('Stack:', error.stack);
     return res.status(500).json({
       success: false,
       error: 'Erro interno do servidor',
@@ -379,9 +595,6 @@ export const updateProfile = async (req, res) => {
   }
 };
 
-// ============================================
-// LOGOUT
-// ============================================
 export const logout = async (req, res) => {
   try {
     return res.json({
@@ -397,9 +610,6 @@ export const logout = async (req, res) => {
   }
 };
 
-// ============================================
-// VERIFY TOKEN
-// ============================================
 export const verifyToken = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -436,9 +646,6 @@ export const verifyToken = async (req, res) => {
   }
 };
 
-// ============================================
-// FORGOT PASSWORD - ✅ COM ENVIO DE EMAIL
-// ============================================
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -467,7 +674,6 @@ export const forgotPassword = async (req, res) => {
       reset_password_expires: resetExpires
     });
 
-    // ✅ ENVIAR EMAIL
     try {
       await sendPasswordResetEmail(user.email, resetCode, user.name);
       console.log('✅ Email de recuperação enviado para:', user.email);
@@ -479,7 +685,6 @@ export const forgotPassword = async (req, res) => {
       });
     }
 
-    // ✅ NUNCA RETORNA O CÓDIGO NA RESPOSTA
     return res.json({
       success: true,
       message: 'Código de recuperação enviado para seu email'
@@ -494,9 +699,6 @@ export const forgotPassword = async (req, res) => {
   }
 };
 
-// ============================================
-// VERIFY RESET CODE
-// ============================================
 export const verifyResetCode = async (req, res) => {
   try {
     const { email, code } = req.body;
@@ -545,9 +747,6 @@ export const verifyResetCode = async (req, res) => {
   }
 };
 
-// ============================================
-// RESET PASSWORD
-// ============================================
 export const resetPassword = async (req, res) => {
   try {
     const { email, code, newPassword, confirmPassword } = req.body;

@@ -1,4 +1,4 @@
-// backend/src/controllers/professionalController.js - VERSÃO FINAL COMPLETA
+// backend/src/controllers/professionalController.js
 import db from '../models/index.js';
 import { Op } from 'sequelize';
 
@@ -108,9 +108,7 @@ export const getProfessionalByUserId = async (req, res) => {
   }
 };
 
-// 📋 LISTAR TODOS OS PROFISSIONAIS
-
-
+// 📋 LISTAR TODOS OS PROFISSIONAIS E EMPRESAS
 export const getAllProfessionals = async (req, res) => {
   try {
     const {
@@ -124,20 +122,21 @@ export const getAllProfessionals = async (req, res) => {
     } = req.query;
 
     const offset = (page - 1) * limit;
-    const where = { is_active: true };
 
-    if (category) where.category_id = category;
-    if (city) where.city = { [Op.iLike]: `%${city}%` };
-    if (state) where.state = { [Op.iLike]: `%${state}%` };
+    // ✅ BUSCAR PROFISSIONAIS
+    const whereProfessional = { is_active: true };
+    if (category) whereProfessional.category_id = category;
+    if (city) whereProfessional.city = { [Op.iLike]: `%${city}%` };
+    if (state) whereProfessional.state = { [Op.iLike]: `%${state}%` };
     if (search) {
-      where[Op.or] = [
+      whereProfessional[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
         { description: { [Op.iLike]: `%${search}%` } }
       ];
     }
 
-    const { count, rows: professionals } = await db.Professional.findAndCountAll({
-      where,
+    const professionals = await db.Professional.findAll({
+      where: whereProfessional,
       include: [
         {
           model: db.Category,
@@ -149,50 +148,124 @@ export const getAllProfessionals = async (req, res) => {
           as: 'subcategories',
           through: { attributes: [] },
           attributes: ['id', 'name'],
-          ...(subcategory && {
-            where: { id: subcategory }
-          })
+          ...(subcategory && { where: { id: subcategory } })
         },
-        // ✅ NOVO: Include do User para filtrar clientes
         {
           model: db.User,
           as: 'user',
-          attributes: ['id', 'user_type', 'name'],
-          where: {
-            user_type: {
-              [Op.in]: ['professional', 'company'] // ← APENAS profissionais e empresas
-            }
-          },
-          required: false // ← IMPORTANTE: LEFT JOIN para compatibilidade com profissionais antigos sem user_id
+          attributes: ['id', 'user_type', 'name', 'profile_photo'],
+          where: { user_type: 'professional' },
+          required: false
         }
-      ],
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      order: [['created_at', 'DESC']]
+      ]
     });
 
-    // ✅ FILTRO ADICIONAL: Remover profissionais sem user OU com user_type = 'client'
-    const filteredProfessionals = professionals.filter(prof => {
-      // Se não tem user, mantém (compatibilidade com dados antigos)
-      if (!prof.user) return true;
-      
-      // Se tem user, só mantém se for professional ou company
-      return prof.user.user_type === 'professional' || prof.user.user_type === 'company';
+    // ✅ BUSCAR EMPRESAS
+    const whereCompany = { is_active: true };
+    if (category) whereCompany.category_id = category;
+    if (city) whereCompany.city_id = city;
+    if (state) whereCompany.state = { [Op.iLike]: `%${state}%` };
+    if (search) {
+      whereCompany[Op.or] = [
+        { company_name: { [Op.iLike]: `%${search}%` } },
+        { description: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    const companies = await db.Company.findAll({
+      where: whereCompany,
+      include: [
+        {
+          model: db.Category,
+          as: 'category',
+          attributes: ['id', 'name']
+        },
+        {
+          model: db.Subcategory,
+          as: 'subcategories',
+          through: { attributes: [] },
+          attributes: ['id', 'name'],
+          ...(subcategory && { where: { id: subcategory } })
+        },
+        {
+          model: db.User,
+          as: 'user',
+          attributes: ['id', 'user_type', 'name', 'profile_photo'],
+          where: { user_type: 'company' },
+          required: false
+        }
+      ]
     });
+
+    // ✅ NORMALIZAR PROFISSIONAIS
+    const normalizedProfessionals = professionals
+      .filter(prof => !prof.user || prof.user.user_type === 'professional')
+      .map(prof => ({
+        id: prof.id,
+        name: prof.name,
+        email: prof.email,
+        phone: prof.phone,
+        whatsapp: prof.whatsapp,
+        profile_photo: prof.user?.profile_photo || prof.profile_photo,
+        category_id: prof.category_id, // ✅ ADICIONAR category_id
+        category: prof.category,
+        subcategories: prof.subcategories,
+        city: prof.city,
+        state: prof.state,
+        description: prof.description,
+        experience: prof.experience,
+        education: prof.education,
+        business_address: prof.business_address,
+        google_maps_link: prof.google_maps_link,
+        social_media: prof.social_media,
+        type: 'professional',
+        user_type: 'professional'
+      }));
+
+    // ✅ NORMALIZAR EMPRESAS
+    const normalizedCompanies = companies
+      .filter(comp => !comp.user || comp.user.user_type === 'company')
+      .map(comp => ({
+        id: comp.id,
+        name: comp.company_name,
+        email: comp.email,
+        phone: comp.phone,
+        whatsapp: comp.whatsapp,
+        profile_photo: comp.user?.profile_photo || comp.logo,
+        category_id: comp.category_id, // ✅ ADICIONAR category_id
+        category: comp.category,
+        subcategories: comp.subcategories || [],
+        city: comp.city_id,
+        state: comp.state,
+        description: comp.description,
+        experience: null,
+        education: null,
+        business_address: comp.address,
+        google_maps_link: null,
+        social_media: comp.social_media,
+        type: 'company',
+        user_type: 'company',
+        cnpj: comp.cnpj,
+        website: comp.website
+      }));
+
+    // ✅ COMBINAR E PAGINAR
+    const allResults = [...normalizedProfessionals, ...normalizedCompanies];
+    const paginatedResults = allResults.slice(offset, offset + parseInt(limit));
 
     res.json({
       success: true,
-      data: filteredProfessionals,
+      data: paginatedResults,
       pagination: {
-        total: filteredProfessionals.length, // ← Conta filtrada
+        total: allResults.length,
         page: parseInt(page),
         limit: parseInt(limit),
-        totalPages: Math.ceil(filteredProfessionals.length / limit)
+        totalPages: Math.ceil(allResults.length / limit)
       }
     });
 
   } catch (error) {
-    console.error('Erro ao listar profissionais:', error);
+    console.error('❌ Erro ao listar profissionais:', error);
     res.status(500).json({
       success: false,
       error: 'Erro ao listar profissionais',
@@ -201,16 +274,95 @@ export const getAllProfessionals = async (req, res) => {
   }
 };
 
-
-
-
-
-
-// 🔍 BUSCAR PROFISSIONAL POR ID
+// 🔍 BUSCAR PROFISSIONAL OU EMPRESA POR ID
 export const getProfessionalById = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('🔍 Buscando por ID:', id);
 
+    // ✅ SE O ID COMEÇA COM 'comp-', BUSCA NA TABELA COMPANIES
+    if (id.startsWith('comp-')) {
+      console.log('🏢 Buscando EMPRESA...');
+      
+      const company = await db.Company.findOne({
+        where: { id, is_active: true },
+        include: [
+          {
+            model: db.Category,
+            as: 'category',
+            attributes: ['id', 'name']
+          },
+          {
+            model: db.Subcategory,
+            as: 'subcategories',
+            through: { attributes: [] },
+            attributes: ['id', 'name']
+          },
+          {
+            model: db.User,
+            as: 'user',
+            attributes: ['id', 'name', 'email', 'profile_photo']
+          }
+        ]
+      });
+
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          error: 'Empresa não encontrada'
+        });
+      }
+
+      // Parsear social_media
+      let socialMedia = {};
+      if (company.social_media) {
+        if (typeof company.social_media === 'string') {
+          try {
+            socialMedia = JSON.parse(company.social_media);
+          } catch (e) {
+            console.error('Erro ao parsear social_media:', e);
+          }
+        } else {
+          socialMedia = company.social_media;
+        }
+      }
+
+      const response = {
+        id: company.id,
+        type: 'company',
+        user_type: 'company',
+        company_name: company.company_name,
+        name: company.user?.name || company.company_name,
+        email: company.email || company.user?.email,
+        phone: company.phone,
+        whatsapp: company.whatsapp,
+        profile_photo: company.user?.profile_photo || company.logo,
+        cnpj: company.cnpj,
+        website: company.website,
+        category_id: company.category_id,
+        category: company.category,
+        subcategories: company.subcategories || [],
+        city: company.city_id,
+        state: company.state,
+        description: company.description,
+        business_address: company.address,
+        social_media: socialMedia,
+        is_active: company.is_active,
+        created_at: company.created_at,
+        updated_at: company.updated_at
+      };
+
+      console.log('✅ Empresa encontrada:', response.company_name);
+
+      return res.json({
+        success: true,
+        data: response
+      });
+    }
+
+    // ✅ SENÃO, BUSCA NA TABELA PROFESSIONALS
+    console.log('👷 Buscando PROFISSIONAL...');
+    
     const professional = await db.Professional.findOne({
       where: { id, is_active: true },
       include: [
@@ -224,6 +376,11 @@ export const getProfessionalById = async (req, res) => {
           as: 'subcategories',
           through: { attributes: [] },
           attributes: ['id', 'name']
+        },
+        {
+          model: db.User,
+          as: 'user',
+          attributes: ['id', 'profile_photo']
         }
       ]
     });
@@ -235,22 +392,64 @@ export const getProfessionalById = async (req, res) => {
       });
     }
 
+    // Parsear social_media
+    let socialMedia = {};
+    if (professional.social_media) {
+      if (typeof professional.social_media === 'string') {
+        try {
+          socialMedia = JSON.parse(professional.social_media);
+        } catch (e) {
+          console.error('Erro ao parsear social_media:', e);
+        }
+      } else {
+        socialMedia = professional.social_media;
+      }
+    }
+
+    const response = {
+      id: professional.id,
+      type: 'professional',
+      user_type: 'professional',
+      name: professional.name,
+      email: professional.email,
+      phone: professional.phone,
+      whatsapp: professional.whatsapp,
+      profile_photo: professional.user?.profile_photo || professional.profile_photo,
+      cpf: professional.cpf,
+      category_id: professional.category_id,
+      category: professional.category,
+      subcategories: professional.subcategories || [],
+      city: professional.city,
+      state: professional.state,
+      description: professional.description,
+      experience: professional.experience,
+      education: professional.education,
+      business_address: professional.business_address,
+      google_maps_link: professional.google_maps_link,
+      social_media: socialMedia,
+      is_active: professional.is_active,
+      created_at: professional.created_at,
+      updated_at: professional.updated_at
+    };
+
+    console.log('✅ Profissional encontrado:', response.name);
+
     res.json({
       success: true,
-      data: professional
+      data: response
     });
 
   } catch (error) {
-    console.error('Erro ao buscar profissional:', error);
+    console.error('❌ Erro ao buscar:', error);
     res.status(500).json({
       success: false,
-      error: 'Erro ao buscar profissional',
+      error: 'Erro ao buscar',
       message: error.message
     });
   }
 };
 
-// ✏️ ATUALIZAR PROFISSIONAL - ✅ COM SOCIAL_MEDIA
+// ✏️ ATUALIZAR PROFISSIONAL
 export const updateProfessional = async (req, res) => {
   try {
     const { id } = req.params;
@@ -283,7 +482,6 @@ export const updateProfessional = async (req, res) => {
       });
     }
 
-    // ✅ Preparar social_media para salvar
     let socialMediaToSave = null;
     if (social_media) {
       if (typeof social_media === 'object') {
@@ -298,7 +496,6 @@ export const updateProfessional = async (req, res) => {
       }
     }
 
-    // Atualizar dados básicos
     await professional.update({
       name: name || professional.name,
       email: email || professional.email,
@@ -317,7 +514,6 @@ export const updateProfessional = async (req, res) => {
 
     console.log('✅ Social media salvo:', socialMediaToSave);
 
-    // Atualizar subcategorias se fornecidas
     if (subcategories && Array.isArray(subcategories)) {
       const subcategoryRecords = await db.Subcategory.findAll({
         where: { id: { [Op.in]: subcategories } }
@@ -325,7 +521,6 @@ export const updateProfessional = async (req, res) => {
       await professional.setSubcategories(subcategoryRecords);
     }
 
-    // Recarregar com associações
     const updatedProfessional = await db.Professional.findByPk(id, {
       include: [
         {
@@ -395,14 +590,51 @@ export const addPortfolioItem = async (req, res) => {
       duration,
       completed_at,
       tags,
-      images
+      images // ✅ RECEBER ARRAY DE URLs JÁ UPLOADADAS
     } = req.body;
 
     console.log('➕ Criando portfolio para profissional:', id);
-    console.log('📋 Dados recebidos:', { title, images: images?.length });
+    console.log('📋 Body completo:', req.body);
+    console.log('📁 Files:', req.files);
+
+    // ✅ VERIFICAR SE O PROFISSIONAL EXISTE
+    const professional = await db.Professional.findByPk(id);
+    if (!professional) {
+      return res.status(404).json({
+        success: false,
+        error: 'Profissional não encontrado'
+      });
+    }
+
+    // ✅ VERIFICAR PERMISSÃO
+    if (req.user && professional.user_id !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Você não tem permissão para adicionar itens a este portfolio'
+      });
+    }
+
+    // ✅ IMAGENS: ou vêm de req.files (upload direto) ou do body (já uploadadas)
+    let imageUrls = [];
+    
+    if (req.files && req.files.length > 0) {
+      // Caso 1: Upload direto via multipart/form-data
+      imageUrls = req.files.map(file => file.path);
+      console.log('📷 Imagens de req.files:', imageUrls);
+    } else if (images && Array.isArray(images) && images.length > 0) {
+      // Caso 2: URLs já foram uploadadas previamente
+      imageUrls = images;
+      console.log('📷 Imagens do body:', imageUrls);
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Nenhuma imagem foi enviada'
+      });
+    }
 
     const portfolioId = `port-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+    // ✅ CRIAR ITEM DO PORTFOLIO
     const portfolioItem = await db.PortfolioItem.create({
       id: portfolioId,
       professional_id: id,
@@ -413,14 +645,15 @@ export const addPortfolioItem = async (req, res) => {
       duration: duration || null,
       completed_at: completed_at || null,
       tags: tags || [],
-      images: images || []
+      images: imageUrls
     });
 
-    console.log('✅ Portfolio criado com sucesso:', portfolioItem.id);
+    console.log('✅ Portfolio criado:', portfolioItem.id);
+    console.log('✅ Imagens salvas:', portfolioItem.images);
 
     res.json({
       success: true,
-      message: 'Item adicionado ao portfolio',
+      message: `Item adicionado ao portfolio com ${imageUrls.length} foto(s)`,
       data: portfolioItem
     });
 
@@ -434,6 +667,8 @@ export const addPortfolioItem = async (req, res) => {
     });
   }
 };
+
+
 
 // ✏️ ATUALIZAR ITEM DO PORTFOLIO
 export const updatePortfolioItem = async (req, res) => {
@@ -513,8 +748,6 @@ export const indicateProfessional = async (req, res) => {
   try {
     const { id } = req.params;
     const indicatorId = req.user.id;
-
-    // Lógica de indicação aqui
 
     res.json({
       success: true,

@@ -1,4 +1,4 @@
-// frontend/src/components/Header.jsx - COM LINK PARA PERFIL
+// frontend/src/components/Header.jsx - COM LINK PARA PERFIL E COMO FUNCIONA CORRIGIDO
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, User, Menu, X, LogIn, LogOut, UserPlus, UserCircle } from 'lucide-react';

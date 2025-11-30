@@ -1,89 +1,69 @@
-// backend/src/routes/professionals.js - VERSÃO FINAL COM PORTFOLIO
+// backend/src/routes/professionals.js
 import { Router } from 'express';
 import * as professionalController from '../controllers/professionalController.js';
-import { authenticateToken, requireUserType, requireOwnershipOrAdmin, optionalAuth } from '../middleware/auth.js';
+import { authenticateToken } from '../middleware/auth.js';
+import antiScraping from '../middleware/antiScraping.js';
 import { uploadPortfolioPhotos } from '../config/cloudinary.js';
 
 const router = Router();
 
-// ========================================
-// ROTAS PÚBLICAS
-// ========================================
+// 🛡️ RATE LIMIT PARA LISTAGEM
+router.get('/', 
+  antiScraping.professionalRateLimiter,
+  professionalController.getAllProfessionals
+);
 
-// 👤 MEU PERFIL - DEVE VIR ANTES DE /:id PARA NÃO CONFLITAR
-router.get('/me', authenticateToken, professionalController.getProfessionalByUserId);
+// 🛡️ RATE LIMIT PARA PERFIL INDIVIDUAL
+router.get('/:id',
+  antiScraping.professionalRateLimiter,
+  professionalController.getProfessionalById
+);
 
-// 📋 Listar todos profissionais (público)
-router.get('/', optionalAuth, professionalController.getAllProfessionals);
-
-// 🔍 Buscar profissional por ID (público)
-router.get('/:id', optionalAuth, professionalController.getProfessionalById);
-
-// 📂 Listar portfolio do profissional (público)
-router.get('/:id/portfolio', professionalController.getProfessionalPortfolio);
-
-// ========================================
-// ROTAS PROTEGIDAS (REQUEREM LOGIN)
-// ========================================
-
-// ✏️ Atualizar perfil profissional (próprio perfil ou admin)
+// ✅ ROTAS PROTEGIDAS
 router.put('/:id', 
-  authenticateToken, 
-  requireOwnershipOrAdmin('id'), 
+  authenticateToken,
   professionalController.updateProfessional
 );
 
-// 🤝 Indicar profissional (apenas usuários logados)
-router.post('/:id/indicate', 
-  authenticateToken, 
-  requireUserType('professional', 'company'),
+router.post('/:id/indicate',
+  authenticateToken,
   professionalController.indicateProfessional
 );
 
-// 📊 Estatísticas do profissional (próprio perfil ou admin)
-router.get('/:id/stats', 
-  authenticateToken, 
-  requireOwnershipOrAdmin('id'),
+router.get('/:id/stats',
+  authenticateToken,
   professionalController.getProfessionalStats
 );
 
-// ========================================
-// ROTAS DE PORTFOLIO (PROTEGIDAS)
-// ========================================
+// 📂 ROTAS DE PORTFOLIO
+router.get('/:id/portfolio',
+  professionalController.getProfessionalPortfolio
+);
 
-// ➕ Adicionar item ao portfolio
-router.post('/:id/portfolio', 
-  authenticateToken, 
-  requireOwnershipOrAdmin('id'),
+router.post('/:id/portfolio',
+  authenticateToken,
+  uploadPortfolioPhotos.array('photos', 10),
   professionalController.addPortfolioItem
 );
 
-// ✏️ Atualizar item do portfolio
-router.put('/:id/portfolio/:itemId', 
-  authenticateToken, 
-  requireOwnershipOrAdmin('id'),
+router.put('/:id/portfolio/:itemId',
+  authenticateToken,
   professionalController.updatePortfolioItem
 );
 
-// 🗑️ Deletar item do portfolio
-router.delete('/:id/portfolio/:itemId', 
-  authenticateToken, 
-  requireOwnershipOrAdmin('id'),
+router.delete('/:id/portfolio/:itemId',
+  authenticateToken,
   professionalController.deletePortfolioItem
 );
 
-// 📤 Upload de imagens do portfolio
-router.post('/:id/portfolio/upload', 
-  authenticateToken, 
-  requireOwnershipOrAdmin('id'),
-  uploadPortfolioPhotos.array('images', 10),
+router.post('/:id/portfolio/upload',
+  authenticateToken,
+  uploadPortfolioPhotos.array('photos', 10),
   professionalController.uploadPortfolioImages
 );
 
-// 🗑️ Deletar imagem específica do portfolio
-router.delete('/:id/portfolio/image/:imageIndex', 
-  authenticateToken, 
-  requireOwnershipOrAdmin('id'),
+router.delete('/:id/portfolio/images/:imageIndex',
+  authenticateToken,
   professionalController.deletePortfolioImage
 );
 

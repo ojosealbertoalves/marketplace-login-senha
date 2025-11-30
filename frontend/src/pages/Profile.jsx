@@ -1,7 +1,8 @@
-// frontend/src/pages/Profile.jsx - VERSÃO MULTI-TIPO DE USUÁRIO
+// frontend/src/pages/Profile.jsx - VERSÃO FINAL
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
+import { states, getCitiesByState } from '../data/locations';
 import './Profile.css';
 
 const Profile = () => {
@@ -10,16 +11,13 @@ const Profile = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
-  // Estados do formulário principal
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     city: '',
     state: '',
-    user_type: 'professional', // Tipo de usuário
-    
-    // Campos Profissional
+    user_type: 'professional',
     cpf: '',
     category_id: '',
     subcategories: [],
@@ -29,16 +27,10 @@ const Profile = () => {
     whatsapp: '',
     business_address: '',
     google_maps_link: '',
-    
-    // Campos Empresa
     company_name: '',
     cnpj: '',
     website: '',
-    
-    // Campos Cliente
     documento: '',
-    
-    // Redes sociais
     social_media: {
       instagram: '',
       linkedin: '',
@@ -47,17 +39,12 @@ const Profile = () => {
     }
   });
 
-  // Estados de foto de perfil
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-
-  // Estados de categorias
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
-
-  // Estados de portfolio (apenas para profissionais)
   const [portfolioItems, setPortfolioItems] = useState([]);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [editingPortfolio, setEditingPortfolio] = useState(null);
@@ -73,10 +60,9 @@ const Profile = () => {
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [portfolioImagePreviews, setPortfolioImagePreviews] = useState([]);
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
-
   const [userId, setUserId] = useState(null);
+  const [professionalId, setProfessionalId] = useState(null);
 
-  // Carregar dados iniciais
   useEffect(() => {
     if (user) {
       loadUserData();
@@ -84,7 +70,6 @@ const Profile = () => {
     }
   }, [user]);
 
-  // Carregar subcategorias quando categoria mudar
   useEffect(() => {
     if (formData.category_id && formData.user_type === 'professional') {
       loadSubcategories(formData.category_id);
@@ -93,16 +78,11 @@ const Profile = () => {
     }
   }, [formData.category_id, formData.user_type]);
 
-  // ========================================
-  // FUNÇÕES DE CARREGAMENTO
-  // ========================================
-
   const loadUserData = async () => {
     try {
       setLoading(true);
       setError('');
       
-      // ✅ USA A ROTA /auth/profile QUE FUNCIONA PARA TODOS
       const response = await api.get('/auth/profile');
       
       if (!response.data.success) {
@@ -111,10 +91,14 @@ const Profile = () => {
       
       const userData = response.data.data;
       console.log('✅ Dados do usuário carregados:', userData);
+      console.log('🔍 DEBUG professional_id:', userData.professional_id);
+      console.log('🔍 DEBUG user_id:', userData.id);
       
       setUserId(userData.id);
+      const finalProfessionalId = userData.professional_id || userData.id;
+      setProfessionalId(finalProfessionalId);
+      console.log('✅ professionalId SETADO COMO:', finalProfessionalId);
       
-      // Normalizar subcategorias
       let subcategoriesIds = [];
       if (userData.subcategories && Array.isArray(userData.subcategories)) {
         subcategoriesIds = userData.subcategories.map(sub => 
@@ -122,7 +106,6 @@ const Profile = () => {
         );
       }
 
-      // Normalizar redes sociais
       let socialMedia = {
         instagram: '',
         linkedin: '',
@@ -142,7 +125,6 @@ const Profile = () => {
         }
       }
       
-      // ✅ CARREGA TODOS OS CAMPOS INDEPENDENTE DO TIPO
       setFormData({
         name: userData.name || '',
         email: userData.email || '',
@@ -150,8 +132,6 @@ const Profile = () => {
         city: userData.city || '',
         state: userData.state || '',
         user_type: userData.user_type || 'client',
-        
-        // Profissional
         cpf: userData.cpf || '',
         category_id: userData.category_id || '',
         subcategories: subcategoriesIds,
@@ -161,16 +141,10 @@ const Profile = () => {
         whatsapp: userData.whatsapp || '',
         business_address: userData.business_address || '',
         google_maps_link: userData.google_maps_link || '',
-        
-        // Empresa
         company_name: userData.company_name || '',
         cnpj: userData.cnpj || '',
         website: userData.website || '',
-        
-        // Cliente / Geral
         documento: userData.documento || userData.cpf || userData.cnpj || '',
-        
-        // Redes sociais
         social_media: socialMedia
       });
 
@@ -178,9 +152,9 @@ const Profile = () => {
         setPhotoPreview(userData.profile_photo);
       }
 
-      // Carregar portfolio apenas se for profissional
-      if (userData.user_type === 'professional' && userData.id) {
-        await loadPortfolio(userData.id);
+      if (userData.user_type === 'professional' && finalProfessionalId) {
+        console.log('📂 Carregando portfolio para professional_id:', finalProfessionalId);
+        await loadPortfolio(finalProfessionalId);
       }
 
     } catch (err) {
@@ -195,9 +169,7 @@ const Profile = () => {
     try {
       setLoadingCategories(true);
       const response = await api.get('/categories');
-      
       const categoriesData = Array.isArray(response.data) ? response.data : (response.data.data || []);
-      
       setCategories(categoriesData);
     } catch (err) {
       console.error('Erro ao carregar categorias:', err);
@@ -211,9 +183,7 @@ const Profile = () => {
     try {
       setLoadingCategories(true);
       const response = await api.get(`/categories/${categoryId}/subcategories`);
-      
       const subcategoriesData = response.data.data || response.data || [];
-      
       setSubcategories(subcategoriesData);
     } catch (err) {
       console.error('Erro ao carregar subcategorias:', err);
@@ -225,6 +195,7 @@ const Profile = () => {
 
   const loadPortfolio = async (profId) => {
     try {
+      console.log('📂 loadPortfolio chamado com ID:', profId);
       const response = await api.get(`/professionals/${profId}/portfolio`);
       setPortfolioItems(response.data.data || []);
     } catch (err) {
@@ -232,10 +203,6 @@ const Profile = () => {
       setPortfolioItems([]);
     }
   };
-
-  // ========================================
-  // HANDLERS DO FORMULÁRIO PRINCIPAL
-  // ========================================
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -246,7 +213,7 @@ const Profile = () => {
   };
 
   const handleUserTypeChange = (newType) => {
-    if (window.confirm(`Tem certeza que deseja mudar para ${newType === 'professional' ? 'Profissional' : newType === 'company' ? 'Empresa' : 'Cliente Final'}?`)) {
+    if (window.confirm(`Tem certeza que deseja mudar para ${newType === 'professional' ? 'Profissional' : 'Cliente Final'}?`)) {
       setFormData(prev => ({
         ...prev,
         user_type: newType
@@ -287,7 +254,6 @@ const Profile = () => {
       setError('');
       setSuccess('');
 
-      // ✅ USA A ROTA /auth/profile QUE FUNCIONA PARA TODOS
       const response = await api.put('/auth/profile', formData);
 
       if (response.data.success) {
@@ -302,10 +268,6 @@ const Profile = () => {
       setLoading(false);
     }
   };
-
-  // ========================================
-  // HANDLERS DE FOTO DE PERFIL
-  // ========================================
 
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
@@ -334,24 +296,19 @@ const Profile = () => {
       formDataUpload.append('photo', profilePhoto);
 
       const response = await api.post('/upload/profile-photo', formDataUpload, {
-        headers: { 
-          'Content-Type': 'multipart/form-data'
-        }
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
       if (response.data.success || response.data.photoUrl || response.data.data?.imageUrl) {
         const photoUrl = response.data.photoUrl || response.data.data?.imageUrl;
-        
         setSuccess('Foto de perfil atualizada com sucesso!');
         setProfilePhoto(null);
         setPhotoPreview(photoUrl);
-        
         await refreshUser();
         await loadUserData();
       }
     } catch (err) {
       console.error('Erro completo:', err);
-      
       if (err.response?.status === 401) {
         setError('Sessão expirada. Por favor, faça login novamente.');
       } else {
@@ -363,27 +320,22 @@ const Profile = () => {
   };
 
   const handleDeletePhoto = async () => {
-    if (!window.confirm('Tem certeza que deseja remover sua foto de perfil?')) {
-      return;
-    }
+    if (!window.confirm('Tem certeza que deseja remover sua foto de perfil?')) return;
 
     try {
       setUploadingPhoto(true);
       setError('');
-      
       const response = await api.delete('/upload/profile-photo');
 
       if (response.data.success) {
         setSuccess('Foto de perfil removida com sucesso!');
         setPhotoPreview('');
         setProfilePhoto(null);
-        
         await refreshUser();
         await loadUserData();
       }
     } catch (err) {
       console.error('Erro ao deletar foto:', err);
-      
       if (err.response?.status === 401) {
         setError('Sessão expirada. Por favor, faça login novamente.');
       } else {
@@ -393,10 +345,6 @@ const Profile = () => {
       setUploadingPhoto(false);
     }
   };
-
-  // ========================================
-  // HANDLERS DE PORTFOLIO (mantidos iguais, mas apenas para profissionais)
-  // ========================================
 
   const openPortfolioModal = (item = null) => {
     if (item) {
@@ -447,24 +395,17 @@ const Profile = () => {
 
   const handlePortfolioFormChange = (e) => {
     const { name, value } = e.target;
-    setPortfolioForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setPortfolioForm(prev => ({ ...prev, [name]: value }));
   };
 
   const handlePortfolioTagsChange = (e) => {
     const tagsString = e.target.value;
     const tagsArray = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag);
-    setPortfolioForm(prev => ({
-      ...prev,
-      tags: tagsArray
-    }));
+    setPortfolioForm(prev => ({ ...prev, tags: tagsArray }));
   };
 
   const handlePortfolioImagesChange = (e) => {
     const files = Array.from(e.target.files);
-    
     if (files.length === 0) return;
 
     const totalImages = portfolioImagePreviews.length + files.length;
@@ -499,12 +440,8 @@ const Profile = () => {
     
     if (editingPortfolio) {
       const imageToRemove = portfolioImagePreviews[index];
-      
       if (imageToRemove && imageToRemove.startsWith('data:')) {
-        const newImageIndex = portfolioImagePreviews
-          .slice(0, index)
-          .filter(img => img.startsWith('data:')).length;
-        
+        const newImageIndex = portfolioImagePreviews.slice(0, index).filter(img => img.startsWith('data:')).length;
         setPortfolioImages(prev => prev.filter((_, i) => i !== newImageIndex));
       }
     } else {
@@ -512,133 +449,125 @@ const Profile = () => {
     }
   };
 
+  // ✅ FUNÇÃO CORRIGIDA - FLUXO EM 2 ETAPAS
   const handlePortfolioSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!professionalId) {
+      setError('ID do profissional não encontrado');
+      return;
+    }
+
+    if (portfolioImages.length === 0 && !editingPortfolio) {
+      setError('Selecione pelo menos uma imagem');
+      return;
+    }
     
     try {
       setUploadingPortfolio(true);
       setError('');
 
       if (editingPortfolio) {
-        let finalImages = [...portfolioImagePreviews];
+        // ✅ MODO EDIÇÃO
+        let finalImages = [...portfolioImagePreviews.filter(img => !img.startsWith('data:'))];
         
         if (portfolioImages.length > 0) {
+          console.log('📤 Fazendo upload de novas imagens...');
           const formDataUpload = new FormData();
-          portfolioImages.forEach(file => {
-            formDataUpload.append('photos', file);
+          portfolioImages.forEach(file => formDataUpload.append('photos', file));
+
+          const uploadResponse = await api.post('/upload/portfolio-photos', formDataUpload, {
+            headers: { 'Content-Type': 'multipart/form-data' }
           });
 
-          try {
-            const uploadResponse = await api.post(
-              '/upload/portfolio-photos',
-              formDataUpload,
-              {
-                headers: { 'Content-Type': 'multipart/form-data' }
-              }
-            );
+          console.log('✅ Upload response:', uploadResponse.data);
 
-            if (uploadResponse.data.success && uploadResponse.data.photoUrls) {
-              const newUrls = uploadResponse.data.photoUrls;
-              finalImages = finalImages.map(img => 
-                img.startsWith('data:') ? newUrls.shift() || img : img
-              );
-              
-              if (newUrls.length > 0) {
-                finalImages.push(...newUrls);
-              }
-            }
-          } catch (uploadError) {
-            console.error('❌ Erro no upload:', uploadError);
-            setError(uploadError.response?.data?.error || 'Erro ao fazer upload das imagens');
-            setUploadingPortfolio(false);
-            return;
+          if (uploadResponse.data.success && uploadResponse.data.photoUrls) {
+            finalImages = [...finalImages, ...uploadResponse.data.photoUrls];
           }
         }
 
         const projectData = {
           ...portfolioForm,
-          images: finalImages.filter(img => !img.startsWith('data:'))
+          images: finalImages
         };
 
-        const response = await api.put(
-          `/professionals/${userId}/portfolio/${editingPortfolio.id}`,
-          projectData
-        );
+        const response = await api.put(`/professionals/${professionalId}/portfolio/${editingPortfolio.id}`, projectData);
 
         if (response.data.success) {
           setSuccess('Projeto atualizado com sucesso!');
-          await loadPortfolio(userId);
+          await loadPortfolio(professionalId);
           closePortfolioModal();
         }
         
       } else {
-        let imageUrls = [];
+        // ✅ MODO CRIAÇÃO - FLUXO EM 2 ETAPAS
+        console.log('📤 PASSO 1: Fazendo upload das imagens...');
         
-        if (portfolioImages.length > 0) {
-          const formDataUpload = new FormData();
-          portfolioImages.forEach(file => {
-            formDataUpload.append('photos', file);
-          });
+        const formDataUpload = new FormData();
+        portfolioImages.forEach(file => formDataUpload.append('photos', file));
 
-          try {
-            const uploadResponse = await api.post(
-              '/upload/portfolio-photos',
-              formDataUpload,
-              {
-                headers: { 'Content-Type': 'multipart/form-data' }
-              }
-            );
+        const uploadResponse = await api.post('/upload/portfolio-photos', formDataUpload, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
 
-            if (uploadResponse.data.success && uploadResponse.data.photoUrls) {
-              imageUrls = uploadResponse.data.photoUrls;
-            }
-          } catch (uploadError) {
-            console.error('❌ Erro no upload:', uploadError);
-            setError(uploadError.response?.data?.error || 'Erro ao fazer upload das imagens');
-            setUploadingPortfolio(false);
-            return;
-          }
+        console.log('✅ Upload response:', uploadResponse.data);
+
+        // ✅ EXTRAIR URLs
+        const imageUrls = uploadResponse.data.photoUrls || 
+                          uploadResponse.data.urls || 
+                          uploadResponse.data.data?.photoUrls ||
+                          uploadResponse.data.data?.urls ||
+                          uploadResponse.data.data?.images ||
+                          [];
+        
+        console.log('📷 URLs extraídas:', imageUrls);
+        
+        if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
+          throw new Error('Nenhuma URL de imagem retornada');
         }
 
+        // ✅ PASSO 2: CRIAR ITEM DO PORTFOLIO
+        console.log('📤 PASSO 2: Criando item do portfolio...');
+        
         const projectData = {
           ...portfolioForm,
           images: imageUrls
         };
 
-        const response = await api.post(
-          `/professionals/${userId}/portfolio`,
-          projectData
-        );
+        console.log('📦 Dados do portfolio:', projectData);
+
+        const response = await api.post(`/professionals/${professionalId}/portfolio`, projectData, {
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        console.log('✅ Portfolio salvo:', response.data);
 
         if (response.data.success) {
           setSuccess('Projeto adicionado com sucesso!');
-          await loadPortfolio(userId);
+          await loadPortfolio(professionalId);
           closePortfolioModal();
         }
       }
     } catch (err) {
-      console.error('❌ Erro ao salvar projeto:', err);
-      setError(err.response?.data?.error || 'Erro ao salvar projeto');
+      console.error('❌ Erro completo:', err);
+      console.error('❌ Response:', err.response?.data);
+      setError(err.response?.data?.error || err.message || 'Erro ao salvar projeto');
     } finally {
       setUploadingPortfolio(false);
     }
   };
 
   const handleDeletePortfolioItem = async (itemId) => {
-    if (!window.confirm('Tem certeza que deseja remover este projeto do portfolio?')) {
-      return;
-    }
+    if (!window.confirm('Tem certeza que deseja remover este projeto do portfolio?')) return;
 
     try {
       setLoading(true);
-      
-      const response = await api.delete(
-        `/professionals/${userId}/portfolio/${itemId}`
-      );
+      const response = await api.delete(`/professionals/${professionalId}/portfolio/${itemId}`);
 
       if (response.data.success) {
         setSuccess('Projeto removido com sucesso!');
-        await loadPortfolio(userId);
+        await loadPortfolio(professionalId);
       }
     } catch (err) {
       console.error('❌ Erro ao deletar projeto:', err);
@@ -647,10 +576,6 @@ const Profile = () => {
       setLoading(false);
     }
   };
-
-  // ========================================
-  // RENDER
-  // ========================================
 
   if (loading && !userId) {
     return (
@@ -662,7 +587,6 @@ const Profile = () => {
   }
 
   const isProfessional = formData.user_type === 'professional';
-  const isCompany = formData.user_type === 'company';
   const isClient = formData.user_type === 'client';
 
   return (
@@ -682,21 +606,12 @@ const Profile = () => {
         </div>
       )}
 
-      {/* ========================================
-          SELETOR DE TIPO DE USUÁRIO
-          ======================================== */}
       <div className="profile-section user-type-section">
         <h2>👤 Tipo de Conta</h2>
-        <p className="section-description">
-          Escolha como você quer aparecer na plataforma
-        </p>
+        <p className="section-description">Escolha como você quer aparecer na plataforma</p>
         
         <div className="user-type-selector">
-          <button
-            type="button"
-            className={`type-button ${isProfessional ? 'active' : ''}`}
-            onClick={() => handleUserTypeChange('professional')}
-          >
+          <button type="button" className={`type-button ${isProfessional ? 'active' : ''}`} onClick={() => handleUserTypeChange('professional')}>
             <span className="type-icon">👷</span>
             <div>
               <strong>Profissional</strong>
@@ -704,23 +619,7 @@ const Profile = () => {
             </div>
           </button>
           
-          <button
-            type="button"
-            className={`type-button ${isCompany ? 'active' : ''}`}
-            onClick={() => handleUserTypeChange('company')}
-          >
-            <span className="type-icon">🏢</span>
-            <div>
-              <strong>Empresa</strong>
-              <small>Apareço nas buscas representando minha empresa</small>
-            </div>
-          </button>
-          
-          <button
-            type="button"
-            className={`type-button ${isClient ? 'active' : ''}`}
-            onClick={() => handleUserTypeChange('client')}
-          >
+          <button type="button" className={`type-button ${isClient ? 'active' : ''}`} onClick={() => handleUserTypeChange('client')}>
             <span className="type-icon">👤</span>
             <div>
               <strong>Cliente Final</strong>
@@ -730,9 +629,6 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* ========================================
-          FOTO DE PERFIL
-          ======================================== */}
       <div className="profile-section">
         <h2>📸 Foto de Perfil</h2>
         <div className="profile-photo-section">
@@ -742,33 +638,15 @@ const Profile = () => {
             </div>
           )}
           <div className="photo-upload">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoChange}
-              id="profile-photo-input"
-              style={{ display: 'none' }}
-            />
-            <label htmlFor="profile-photo-input" className="btn btn-secondary">
-              📁 Escolher Foto
-            </label>
+            <input type="file" accept="image/*" onChange={handlePhotoChange} id="profile-photo-input" style={{ display: 'none' }} />
+            <label htmlFor="profile-photo-input" className="btn btn-secondary">📁 Escolher Foto</label>
             {profilePhoto && (
-              <button
-                type="button"
-                onClick={handlePhotoUpload}
-                disabled={uploadingPhoto}
-                className="btn btn-primary"
-              >
+              <button type="button" onClick={handlePhotoUpload} disabled={uploadingPhoto} className="btn btn-primary">
                 {uploadingPhoto ? '⏳ Enviando...' : '✅ Salvar Foto'}
               </button>
             )}
             {photoPreview && (
-              <button
-                type="button"
-                onClick={handleDeletePhoto}
-                disabled={uploadingPhoto}
-                className="btn btn-danger"
-              >
+              <button type="button" onClick={handleDeletePhoto} disabled={uploadingPhoto} className="btn btn-danger">
                 🗑️ Remover Foto
               </button>
             )}
@@ -777,26 +655,17 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* ========================================
-          PORTFOLIO (APENAS PARA PROFISSIONAIS)
-          ======================================== */}
       {isProfessional && (
         <div className="profile-section portfolio-section">
           <div className="portfolio-header">
             <div className="section-header">
               <h2>🎨 Meu Portfolio</h2>
             </div>
-            <button
-              type="button"
-              onClick={() => openPortfolioModal()}
-              className="btn btn-primary"
-            >
+            <button type="button" onClick={() => openPortfolioModal()} className="btn btn-primary">
               ➕ Adicionar Projeto
             </button>
           </div>
-          <p className="section-description">
-            Mostre seus melhores trabalhos para atrair mais clientes
-          </p>
+          <p className="section-description">Mostre seus melhores trabalhos para atrair mais clientes</p>
 
           {portfolioItems.length > 0 ? (
             <div className="portfolio-grid">
@@ -805,17 +674,11 @@ const Profile = () => {
                   <div className="portfolio-card-image">
                     {item.images && item.images.length > 0 ? (
                       <>
-                        <img
-                          src={item.images[0]}
-                          alt={item.title}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.parentElement.innerHTML = '<div class="no-image">📷</div>';
-                          }}
-                        />
-                        {item.images.length > 1 && (
-                          <span className="image-count">+{item.images.length - 1}</span>
-                        )}
+                        <img src={item.images[0]} alt={item.title} onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.parentElement.innerHTML = '<div class="no-image">📷</div>';
+                        }} />
+                        {item.images.length > 1 && <span className="image-count">+{item.images.length - 1}</span>}
                       </>
                     ) : (
                       <div className="no-image">📷</div>
@@ -823,25 +686,13 @@ const Profile = () => {
                   </div>
                   <div className="portfolio-card-content">
                     <h3>{item.title}</h3>
-                    {item.project_type && (
-                      <span className="project-type">{item.project_type}</span>
-                    )}
-                    {item.description && (
-                      <p className="portfolio-description">{item.description}</p>
-                    )}
+                    {item.project_type && <span className="project-type">{item.project_type}</span>}
+                    {item.description && <p className="portfolio-description">{item.description}</p>}
                     <div className="portfolio-card-actions">
-                      <button
-                        type="button"
-                        onClick={() => openPortfolioModal(item)}
-                        className="btn btn-sm btn-secondary"
-                      >
+                      <button type="button" onClick={() => openPortfolioModal(item)} className="btn btn-sm btn-secondary">
                         ✏️ Editar
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePortfolioItem(item.id)}
-                        className="btn btn-sm btn-danger"
-                      >
+                      <button type="button" onClick={() => handleDeletePortfolioItem(item.id)} className="btn btn-sm btn-danger">
                         🗑️ Remover
                       </button>
                     </div>
@@ -852,11 +703,7 @@ const Profile = () => {
           ) : (
             <div className="empty-state">
               <p>📁 Você ainda não adicionou nenhum projeto ao seu portfolio</p>
-              <button
-                type="button"
-                onClick={() => openPortfolioModal()}
-                className="btn btn-primary"
-              >
+              <button type="button" onClick={() => openPortfolioModal()} className="btn btn-primary">
                 ➕ Adicionar Primeiro Projeto
               </button>
             </div>
@@ -864,403 +711,208 @@ const Profile = () => {
         </div>
       )}
 
-      {/* ========================================
-          FORMULÁRIO PRINCIPAL
-          ======================================== */}
       <form onSubmit={handleSubmit} className="profile-form">
         
-        {/* INFORMAÇÕES PESSOAIS */}
-       
-
 <div className="profile-section">
-  <h2>👤 Informações {isCompany ? 'da Empresa' : 'Pessoais'}</h2>
+  <h2>👤 Informações Pessoais</h2>
   
   <div className="form-row">
     <div className="form-group">
-      <label htmlFor="name">
-        {isCompany ? 'Nome do Responsável' : 'Nome Completo'} *
-      </label>
-      <input
-        type="text"
-        id="name"
-        name="name"
-        value={formData.name}
-        onChange={handleChange}
-        required
-        placeholder={isCompany ? "Nome do responsável" : "Seu nome completo"}
-      />
+      <label htmlFor="name">Nome Completo *</label>
+      <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} required placeholder="Seu nome completo" />
     </div>
 
     <div className="form-group">
       <label htmlFor="email">Email *</label>
-      <input
-        type="email"
-        id="email"
-        name="email"
-        value={formData.email}
-        onChange={handleChange}
-        required
-        placeholder="seu@email.com"
-      />
+      <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} required placeholder="seu@email.com" />
     </div>
   </div>
 
-  {isCompany && (
-    <div className="form-group">
-      <label htmlFor="company_name">Nome da Empresa *</label>
-      <input
-        type="text"
-        id="company_name"
-        name="company_name"
-        value={formData.company_name}
-        onChange={handleChange}
-        placeholder="Nome fantasia ou razão social"
-      />
-    </div>
-  )}
-
   <div className="form-row">
-    {/* ✅ CPF/CNPJ/DOCUMENTO - SOMENTE LEITURA */}
     {isProfessional && formData.cpf && (
       <div className="form-group">
         <label htmlFor="cpf">CPF</label>
-        <input
-          type="text"
-          id="cpf"
-          name="cpf"
-          value={formData.cpf}
-          readOnly
-          className="readonly-input"
-          style={{
-            backgroundColor: '#f3f4f6',
-            cursor: 'not-allowed',
-            color: '#6b7280'
-          }}
-        />
-        <p className="help-text" style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-          ℹ️ CPF não pode ser alterado
-        </p>
-      </div>
-    )}
-
-    {isCompany && formData.cnpj && (
-      <div className="form-group">
-        <label htmlFor="cnpj">CNPJ</label>
-        <input
-          type="text"
-          id="cnpj"
-          name="cnpj"
-          value={formData.cnpj}
-          readOnly
-          className="readonly-input"
-          style={{
-            backgroundColor: '#f3f4f6',
-            cursor: 'not-allowed',
-            color: '#6b7280'
-          }}
-        />
-        <p className="help-text" style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-          ℹ️ CNPJ não pode ser alterado
-        </p>
+        <input type="text" id="cpf" name="cpf" value={formData.cpf} readOnly className="readonly-input" style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed', color: '#6b7280' }} />
+        <p className="help-text" style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>ℹ️ CPF não pode ser alterado</p>
       </div>
     )}
 
     {isClient && formData.documento && (
       <div className="form-group">
         <label htmlFor="documento">CPF/CNPJ</label>
-        <input
-          type="text"
-          id="documento"
-          name="documento"
-          value={formData.documento}
-          readOnly
-          className="readonly-input"
-          style={{
-            backgroundColor: '#f3f4f6',
-            cursor: 'not-allowed',
-            color: '#6b7280'
-          }}
-        />
-        <p className="help-text" style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-          ℹ️ Documento não pode ser alterado
-        </p>
+        <input type="text" id="documento" name="documento" value={formData.documento} readOnly className="readonly-input" style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed', color: '#6b7280' }} />
+        <p className="help-text" style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>ℹ️ Documento não pode ser alterado</p>
       </div>
     )}
 
     <div className="form-group">
       <label htmlFor="phone">Telefone</label>
-      <input
-        type="tel"
-        id="phone"
-        name="phone"
-        value={formData.phone}
-        onChange={handleChange}
-        placeholder="(00) 00000-0000"
-      />
+      <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
     </div>
   </div>
 
   {isProfessional && (
     <div className="form-group">
       <label htmlFor="whatsapp">WhatsApp</label>
-      <input
-        type="tel"
-        id="whatsapp"
-        name="whatsapp"
-        value={formData.whatsapp}
-        onChange={handleChange}
-        placeholder="(00) 00000-0000"
-      />
+      <input type="tel" id="whatsapp" name="whatsapp" value={formData.whatsapp} onChange={handleChange} placeholder="(00) 00000-0000" />
     </div>
   )}
 </div>
 
+{isProfessional && (
+  <div className="profile-section">
+    <h2>🏷️ Categoria e Especialidades</h2>
+    
+    <div className="form-group">
+      <label htmlFor="category_id">Categoria Principal *</label>
+      <select id="category_id" name="category_id" value={formData.category_id} onChange={handleChange} required disabled={loadingCategories}>
+        <option value="">Selecione uma categoria</option>
+        {categories.map(category => (
+          <option key={category.id} value={category.id}>{category.name}</option>
+        ))}
+      </select>
+    </div>
 
-
-        {/* CATEGORIA E ESPECIALIDADES (APENAS PROFISSIONAL) */}
-        {isProfessional && (
-          <div className="profile-section">
-            <h2>🏷️ Categoria e Especialidades</h2>
-            
-            <div className="form-group">
-              <label htmlFor="category_id">Categoria Principal *</label>
-              <select
-                id="category_id"
-                name="category_id"
-                value={formData.category_id}
-                onChange={handleChange}
-                required
-                disabled={loadingCategories}
-              >
-                <option value="">Selecione uma categoria</option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {formData.category_id && subcategories.length > 0 && (
-              <div className="form-group">
-                <label>Subcategorias / Especialidades</label>
-                <p className="help-text" style={{ marginBottom: '12px' }}>
-                  Selecione uma ou mais especialidades da sua área
-                </p>
-                
-                {loadingCategories ? (
-                  <div className="loading-subcategories">
-                    <p>Carregando especialidades...</p>
-                  </div>
-                ) : (
-                  <div className="subcategories-checkbox-list">
-                    {subcategories.map(sub => (
-                      <label key={sub.id} className="checkbox-item">
-                        <input
-                          type="checkbox"
-                          value={sub.id}
-                          checked={formData.subcategories.includes(sub.id)}
-                          onChange={() => handleSubcategoryToggle(sub.id)}
-                        />
-                        <span className="checkbox-label">{sub.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-                
-                {formData.subcategories.length > 0 && (
-                  <p className="help-text" style={{ marginTop: '12px', color: '#10b981' }}>
-                    ✓ {formData.subcategories.length} especialidade(s) selecionada(s)
-                  </p>
-                )}
-              </div>
-            )}
-
-            {formData.category_id && subcategories.length === 0 && !loadingCategories && (
-              <div className="form-group">
-                <p className="help-text" style={{ color: '#6b7280', fontStyle: 'italic', padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
-                  ℹ️ Esta categoria ainda não possui subcategorias cadastradas.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* INFORMAÇÕES PROFISSIONAIS */}
-        {(isProfessional || isCompany) && (
-          <div className="profile-section">
-            <h2>💼 Informações {isCompany ? 'da Empresa' : 'Profissionais'}</h2>
-            
-            <div className="form-group">
-              <label htmlFor="description">
-                {isCompany ? 'Sobre a Empresa' : 'Sobre Você'}
+    {formData.category_id && subcategories.length > 0 && (
+      <div className="form-group">
+        <label>Subcategorias / Especialidades</label>
+        <p className="help-text" style={{ marginBottom: '12px' }}>Selecione uma ou mais especialidades da sua área</p>
+        
+        {loadingCategories ? (
+          <div className="loading-subcategories"><p>Carregando especialidades...</p></div>
+        ) : (
+          <div className="subcategories-checkbox-list">
+            {subcategories.map(sub => (
+              <label key={sub.id} className="checkbox-item">
+                <input type="checkbox" value={sub.id} checked={formData.subcategories.includes(sub.id)} onChange={() => handleSubcategoryToggle(sub.id)} />
+                <span className="checkbox-label">{sub.name}</span>
               </label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows="4"
-                placeholder={isCompany ? "Conte sobre sua empresa..." : "Conte um pouco sobre você e seu trabalho..."}
-              />
-            </div>
-
-            {isProfessional && (
-              <>
-                <div className="form-group">
-                  <label htmlFor="experience">Experiência</label>
-                  <textarea
-                    id="experience"
-                    name="experience"
-                    value={formData.experience}
-                    onChange={handleChange}
-                    rows="3"
-                    placeholder="Descreva sua experiência profissional..."
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="education">Formação</label>
-                  <textarea
-                    id="education"
-                    name="education"
-                    value={formData.education}
-                    onChange={handleChange}
-                    rows="3"
-                    placeholder="Cursos, certificações, formação acadêmica..."
-                  />
-                </div>
-              </>
-            )}
+            ))}
           </div>
         )}
-
-        {/* REDES SOCIAIS */}
-        {(isProfessional || isCompany) && (
-          <div className="profile-section">
-            <h2>🌐 Redes Sociais e Website</h2>
-            <p className="section-description">
-              Adicione seus perfis nas redes sociais para facilitar o contato com clientes
-            </p>
-            
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="instagram">📷 Instagram</label>
-                <input
-                  type="url"
-                  id="instagram"
-                  name="instagram"
-                  value={formData.social_media.instagram || ''}
-                  onChange={handleSocialMediaChange}
-                  placeholder="https://instagram.com/seu-usuario"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="linkedin">💼 LinkedIn</label>
-                <input
-                  type="url"
-                  id="linkedin"
-                  name="linkedin"
-                  value={formData.social_media.linkedin || ''}
-                  onChange={handleSocialMediaChange}
-                  placeholder="https://linkedin.com/in/seu-perfil"
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="youtube">📹 YouTube</label>
-                <input
-                  type="url"
-                  id="youtube"
-                  name="youtube"
-                  value={formData.social_media.youtube || ''}
-                  onChange={handleSocialMediaChange}
-                  placeholder="https://youtube.com/@seu-canal"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="website">🌐 Website / Portfólio</label>
-                <input
-                  type="url"
-                  id="website"
-                  name="website"
-                  value={isCompany ? formData.website : formData.social_media.website || ''}
-                  onChange={isCompany ? handleChange : handleSocialMediaChange}
-                  placeholder="https://seusite.com.br"
-                />
-              </div>
-            </div>
-          </div>
+        
+        {formData.subcategories.length > 0 && (
+          <p className="help-text" style={{ marginTop: '12px', color: '#10b981' }}>
+            ✓ {formData.subcategories.length} especialidade(s) selecionada(s)
+          </p>
         )}
+      </div>
+    )}
 
-        {/* LOCALIZAÇÃO */}
-        <div className="profile-section">
-          <h2>📍 Localização</h2>
-          
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="city">Cidade</label>
-              <input
-                type="text"
-                id="city"
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                placeholder="Sua cidade"
-              />
-            </div>
+    {formData.category_id && subcategories.length === 0 && !loadingCategories && (
+      <div className="form-group">
+        <p className="help-text" style={{ color: '#6b7280', fontStyle: 'italic', padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
+          ℹ️ Esta categoria ainda não possui subcategorias cadastradas.
+        </p>
+      </div>
+    )}
+  </div>
+)}
 
-            <div className="form-group">
-              <label htmlFor="state">Estado</label>
-              <input
-                type="text"
-                id="state"
-                name="state"
-                value={formData.state}
-                onChange={handleChange}
-                placeholder="UF"
-                maxLength="2"
-              />
-            </div>
-          </div>
+{isProfessional && (
+  <div className="profile-section">
+    <h2>💼 Informações Profissionais</h2>
+    
+    <div className="form-group">
+      <label htmlFor="description">Sobre Você</label>
+      <textarea id="description" name="description" value={formData.description} onChange={handleChange} rows="4" placeholder="Conte um pouco sobre você e seu trabalho..." />
+    </div>
 
-          {(isProfessional || isCompany) && (
-            <>
-              <div className="form-group">
-                <label htmlFor="business_address">Endereço {isCompany ? 'da Empresa' : 'Comercial'}</label>
-                <input
-                  type="text"
-                  id="business_address"
-                  name="business_address"
-                  value={formData.business_address}
-                  onChange={handleChange}
-                  placeholder="Rua, número, bairro..."
-                />
-              </div>
+    <div className="form-group">
+      <label htmlFor="experience">Experiência</label>
+      <textarea id="experience" name="experience" value={formData.experience} onChange={handleChange} rows="3" placeholder="Descreva sua experiência profissional..." />
+    </div>
 
-              <div className="form-group">
-                <label htmlFor="google_maps_link">Link do Google Maps</label>
-                <input
-                  type="url"
-                  id="google_maps_link"
-                  name="google_maps_link"
-                  value={formData.google_maps_link}
-                  onChange={handleChange}
-                  placeholder="https://maps.google.com/..."
-                />
-                <p className="help-text">
-                  Cole o link do Google Maps para facilitar que clientes encontrem você
-                </p>
-              </div>
-            </>
-          )}
-        </div>
+    <div className="form-group">
+      <label htmlFor="education">Formação</label>
+      <textarea id="education" name="education" value={formData.education} onChange={handleChange} rows="3" placeholder="Cursos, certificações, formação acadêmica..." />
+    </div>
+  </div>
+)}
 
-        {/* BOTÃO DE SALVAR */}
+{isProfessional && (
+  <div className="profile-section">
+    <h2>🌐 Redes Sociais e Website</h2>
+    <p className="section-description">Adicione seus perfis nas redes sociais para facilitar o contato com clientes</p>
+    
+    <div className="form-row">
+      <div className="form-group">
+        <label htmlFor="instagram">📷 Instagram</label>
+        <input type="url" id="instagram" name="instagram" value={formData.social_media.instagram || ''} onChange={handleSocialMediaChange} placeholder="https://instagram.com/seu-usuario" />
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="linkedin">💼 LinkedIn</label>
+        <input type="url" id="linkedin" name="linkedin" value={formData.social_media.linkedin || ''} onChange={handleSocialMediaChange} placeholder="https://linkedin.com/in/seu-perfil" />
+      </div>
+    </div>
+
+    <div className="form-row">
+      <div className="form-group">
+        <label htmlFor="youtube">📹 YouTube</label>
+        <input type="url" id="youtube" name="youtube" value={formData.social_media.youtube || ''} onChange={handleSocialMediaChange} placeholder="https://youtube.com/@seu-canal" />
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="website">🌐 Website / Portfólio</label>
+        <input type="url" id="website" name="website" value={formData.social_media.website || ''} onChange={handleSocialMediaChange} placeholder="https://seusite.com.br" />
+      </div>
+    </div>
+  </div>
+)}
+
+<div className="profile-section">
+  <h2>📍 Localização</h2>
+  
+  <div className="form-row">
+    <div className="form-group">
+      <label htmlFor="state">Estado</label>
+      <select 
+        id="state" 
+        name="state" 
+        value={formData.state} 
+        onChange={handleChange}
+      >
+        <option value="">Selecione o estado</option>
+        {states.map(state => (
+          <option key={state.value} value={state.value}>{state.label}</option>
+        ))}
+      </select>
+    </div>
+
+    <div className="form-group">
+      <label htmlFor="city">Cidade</label>
+      <select 
+        id="city" 
+        name="city" 
+        value={formData.city} 
+        onChange={handleChange}
+        disabled={!formData.state}
+      >
+        <option value="">{formData.state ? 'Selecione a cidade' : 'Selecione o estado primeiro'}</option>
+        {formData.state && getCitiesByState(formData.state).map(city => (
+          <option key={city.value} value={city.value}>{city.label}</option>
+        ))}
+      </select>
+    </div>
+  </div>
+
+  {isProfessional && (
+    <>
+      <div className="form-group">
+        <label htmlFor="business_address">Endereço Comercial</label>
+        <input type="text" id="business_address" name="business_address" value={formData.business_address} onChange={handleChange} placeholder="Rua, número, bairro..." />
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="google_maps_link">Link do Google Maps</label>
+        <input type="url" id="google_maps_link" name="google_maps_link" value={formData.google_maps_link} onChange={handleChange} placeholder="https://maps.google.com/..." />
+        <p className="help-text">Cole o link do Google Maps para facilitar que clientes encontrem você</p>
+      </div>
+    </>
+  )}
+</div>
+
         <div className="form-actions">
           <button type="submit" disabled={loading} className="btn btn-primary btn-large">
             {loading ? '⏳ Salvando...' : '💾 Salvar Alterações'}
@@ -1268,119 +920,57 @@ const Profile = () => {
         </div>
       </form>
 
-      {/* MODAL DE PORTFOLIO (apenas para profissionais) */}
       {isProfessional && showPortfolioModal && (
         <div className="modal-overlay" onClick={closePortfolioModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingPortfolio ? '✏️ Editar Projeto' : '➕ Novo Projeto'}</h2>
-              <button type="button" onClick={closePortfolioModal} className="modal-close">
-                ×
-              </button>
+              <button type="button" onClick={closePortfolioModal} className="modal-close">×</button>
             </div>
 
             <form onSubmit={handlePortfolioSubmit} className="portfolio-form">
               <div className="form-group">
                 <label htmlFor="portfolio-title">Título do Projeto</label>
-                <input
-                  type="text"
-                  id="portfolio-title"
-                  name="title"
-                  value={portfolioForm.title}
-                  onChange={handlePortfolioFormChange}
-                  placeholder="Ex: Reforma residencial completa"
-                />
+                <input type="text" id="portfolio-title" name="title" value={portfolioForm.title} onChange={handlePortfolioFormChange} placeholder="Ex: Reforma residencial completa" />
               </div>
 
               <div className="form-group">
                 <label htmlFor="portfolio-description">Descrição</label>
-                <textarea
-                  id="portfolio-description"
-                  name="description"
-                  value={portfolioForm.description}
-                  onChange={handlePortfolioFormChange}
-                  rows="4"
-                  placeholder="Descreva o projeto, desafios e resultados..."
-                />
+                <textarea id="portfolio-description" name="description" value={portfolioForm.description} onChange={handlePortfolioFormChange} rows="4" placeholder="Descreva o projeto, desafios e resultados..." />
               </div>
 
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="portfolio-type">Tipo de Projeto</label>
-                  <input
-                    type="text"
-                    id="portfolio-type"
-                    name="project_type"
-                    value={portfolioForm.project_type}
-                    onChange={handlePortfolioFormChange}
-                    placeholder="Ex: Residencial, Comercial..."
-                  />
+                  <input type="text" id="portfolio-type" name="project_type" value={portfolioForm.project_type} onChange={handlePortfolioFormChange} placeholder="Ex: Residencial, Comercial..." />
                 </div>
 
                 <div className="form-group">
                   <label htmlFor="portfolio-area">Área</label>
-                  <input
-                    type="text"
-                    id="portfolio-area"
-                    name="area"
-                    value={portfolioForm.area}
-                    onChange={handlePortfolioFormChange}
-                    placeholder="Ex: 120m²"
-                  />
+                  <input type="text" id="portfolio-area" name="area" value={portfolioForm.area} onChange={handlePortfolioFormChange} placeholder="Ex: 120m²" />
                 </div>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="portfolio-duration">Duração</label>
-                  <input
-                    type="text"
-                    id="portfolio-duration"
-                    name="duration"
-                    value={portfolioForm.duration}
-                    onChange={handlePortfolioFormChange}
-                    placeholder="Ex: 3 meses"
-                  />
+                  <input type="text" id="portfolio-duration" name="duration" value={portfolioForm.duration} onChange={handlePortfolioFormChange} placeholder="Ex: 3 meses" />
                 </div>
 
                 <div className="form-group">
                   <label htmlFor="portfolio-completed">Data de Conclusão</label>
-                  <input
-                    type="date"
-                    id="portfolio-completed"
-                    name="completed_at"
-                    value={portfolioForm.completed_at}
-                    onChange={handlePortfolioFormChange}
-                  />
+                  <input type="date" id="portfolio-completed" name="completed_at" value={portfolioForm.completed_at} onChange={handlePortfolioFormChange} />
                 </div>
               </div>
 
               <div className="form-group">
                 <label htmlFor="portfolio-tags">Tags (separadas por vírgula)</label>
-                <input
-                  type="text"
-                  id="portfolio-tags"
-                  name="tags"
-                  value={portfolioForm.tags.join(', ')}
-                  onChange={handlePortfolioTagsChange}
-                  placeholder="Ex: moderna, sustentável, luxo"
-                />
+                <input type="text" id="portfolio-tags" name="tags" value={portfolioForm.tags.join(', ')} onChange={handlePortfolioTagsChange} placeholder="Ex: moderna, sustentável, luxo" />
               </div>
 
               <div className="form-group">
-                <label htmlFor="portfolio-images">
-                  {editingPortfolio ? 'Gerenciar Imagens do Projeto (máx. 5)' : 'Imagens do Projeto (máx. 5)'}
-                </label>
-                
-                <input
-                  type="file"
-                  id="portfolio-images"
-                  accept="image/*"
-                  multiple
-                  onChange={handlePortfolioImagesChange}
-                  style={{ display: 'none' }}
-                />
-                
+                <label htmlFor="portfolio-images">{editingPortfolio ? 'Gerenciar Imagens do Projeto (máx. 5)' : 'Imagens do Projeto (máx. 5)'}</label>
+                <input type="file" id="portfolio-images" accept="image/*" multiple onChange={handlePortfolioImagesChange} style={{ display: 'none' }} />
                 <label htmlFor="portfolio-images" className="btn btn-secondary btn-block">
                   📁 {editingPortfolio ? 'Adicionar Mais Imagens' : 'Escolher Imagens'}
                 </label>
@@ -1390,14 +980,7 @@ const Profile = () => {
                     {portfolioImagePreviews.map((preview, index) => (
                       <div key={index} className="image-preview-item">
                         <img src={preview} alt={`Preview ${index + 1}`} />
-                        <button
-                          type="button"
-                          onClick={() => removePortfolioImagePreview(index)}
-                          className="remove-preview"
-                          title="Remover imagem"
-                        >
-                          ×
-                        </button>
+                        <button type="button" onClick={() => removePortfolioImagePreview(index)} className="remove-preview" title="Remover imagem">×</button>
                       </div>
                     ))}
                   </div>
@@ -1410,19 +993,8 @@ const Profile = () => {
               </div>
 
               <div className="modal-actions">
-                <button
-                  type="button"
-                  onClick={closePortfolioModal}
-                  className="btn btn-secondary"
-                  disabled={uploadingPortfolio}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={uploadingPortfolio}
-                >
+                <button type="button" onClick={closePortfolioModal} className="btn btn-secondary" disabled={uploadingPortfolio}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={uploadingPortfolio}>
                   {uploadingPortfolio ? '⏳ Salvando...' : '💾 Salvar Projeto'}
                 </button>
               </div>

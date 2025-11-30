@@ -8,7 +8,6 @@ import { useFilters } from '../hooks/useFilters';
 import { useAuth } from '../contexts/AuthContext';
 import Filters from '../components/Filters';
 import ProfessionalCard from '../components/ProfessionalCard';
-import Footer from '../components/Footer'; // ✅ IMPORTAR O FOOTER
 
 const Home = () => {
   const navigate = useNavigate();
@@ -106,9 +105,6 @@ const Home = () => {
           ))}
         </div>
       </main>
-      
-      {/* ✅ FOOTER NO SKELETON */}
-      <Footer />
     </div>
   );
 
@@ -150,9 +146,6 @@ const Home = () => {
             </div>
           </div>
         </main>
-        
-        {/* ✅ FOOTER NO ERROR STATE */}
-        <Footer />
       </div>
     );
   }
@@ -267,16 +260,13 @@ const Home = () => {
                 <ProfessionalCard
                   key={professional.id}
                   professional={professional}
-                  showContact={isAuthenticated} // Passa o status de autenticação
+                  showContact={isAuthenticated}
                 />
               ))}
             </div>
           )}
         </section>
       </main>
-
-      {/* ✅ FOOTER PRINCIPAL */}
-      <Footer />
     </div>
   );
 };

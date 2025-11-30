@@ -1,33 +1,38 @@
-// src/models/Company.js
+// backend/src/models/Company.js
 import { Model } from 'sequelize';
 
 export default (sequelize, DataTypes) => {
   class Company extends Model {
     static associate(models) {
-      // Uma empresa pertence a um usuário
       Company.belongsTo(models.User, {
         foreignKey: 'user_id',
         as: 'user'
       });
       
-      // Uma empresa pode ter várias vagas (futuro)
-      // Company.hasMany(models.JobOpening, {
-      //   foreignKey: 'company_id',
-      //   as: 'jobOpenings'
-      // });
-      
-      // Uma empresa está em uma cidade
       Company.belongsTo(models.City, {
         foreignKey: 'city_id',
-        as: 'cityRelation'
+        as: 'cityRelation',
+        required: false
+      });
+
+      Company.belongsTo(models.Category, {
+        foreignKey: 'category_id',
+        as: 'category',
+        required: false
+      });
+
+      Company.belongsToMany(models.Subcategory, {
+        through: 'company_subcategories',
+        foreignKey: 'company_id',
+        otherKey: 'subcategory_id',
+        as: 'subcategories'
       });
     }
   }
   
   Company.init({
     id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
+      type: DataTypes.STRING,
       primaryKey: true
     },
     user_id: {
@@ -44,9 +49,17 @@ export default (sequelize, DataTypes) => {
       allowNull: false
     },
     cnpj: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(18),
       allowNull: true,
       unique: true
+    },
+    category_id: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      references: {
+        model: 'categories',
+        key: 'id'
+      }
     },
     description: {
       type: DataTypes.TEXT,
@@ -89,7 +102,7 @@ export default (sequelize, DataTypes) => {
       allowNull: true
     },
     business_areas: {
-      type: DataTypes.JSON, // Array de áreas de atuação
+      type: DataTypes.JSON,
       allowNull: true,
       defaultValue: []
     },
