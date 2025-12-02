@@ -1,5 +1,6 @@
 // frontend/src/contexts/AuthContext.jsx - VERSÃO CORRIGIDA
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
 const AuthContext = createContext();
 
@@ -29,12 +30,10 @@ export function AuthProvider({ children }) {
         console.log('✅ Usuário carregado do localStorage:', parsedUser);
       } catch (error) {
         console.error('❌ Erro ao parsear usuário do localStorage:', error);
-        // Limpa localStorage se tiver dados corrompidos
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
     } else {
-      // Limpa localStorage se tiver dados inválidos
       console.log('⚠️ Dados inválidos no localStorage, limpando...');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -50,7 +49,7 @@ export function AuthProvider({ children }) {
       console.log('📧 Email:', credentials.email);
       console.log('🔒 Password:', credentials.password ? '***' : 'VAZIO');
 
-      const response = await fetch('http://localhost:3001/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials)
@@ -65,7 +64,6 @@ export function AuthProvider({ children }) {
         return { success: false, error: data.error || 'Erro ao fazer login' };
       }
 
-      // ✅ CORRIGIDO: Verificar estrutura da resposta
       if (data.success && data.data) {
         const { user: userData, token: userToken } = data.data;
 
@@ -78,7 +76,6 @@ export function AuthProvider({ children }) {
 
         return { success: true, user: userData, token: userToken };
       } else if (data.token && data.user) {
-        // Formato alternativo de resposta
         console.log('✅ Login bem-sucedido (formato alternativo)!', data.user);
 
         setToken(data.token);
@@ -102,7 +99,7 @@ export function AuthProvider({ children }) {
     try {
       console.log('📝 Tentando cadastro...', userData);
 
-      const response = await fetch('http://localhost:3001/api/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData)
@@ -117,7 +114,6 @@ export function AuthProvider({ children }) {
         return { success: false, error: data.error || 'Erro ao criar conta' };
       }
 
-      // ✅ Verificar estrutura da resposta
       if (data.success && data.data) {
         const { user: newUser, token: userToken } = data.data;
 
@@ -148,7 +144,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Logout
   const logout = async () => {
     console.log('👋 Fazendo logout...');
     setUser(null);
@@ -157,12 +152,11 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('user');
   };
 
-  // Atualizar perfil
   const updateProfile = async (profileData) => {
     try {
       console.log('🔄 Atualizando perfil...', profileData);
 
-      const response = await fetch('http://localhost:3001/api/auth/profile/update', {
+      const response = await fetch(`${API_BASE_URL}/auth/profile/update`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -177,7 +171,6 @@ export function AuthProvider({ children }) {
         return { success: false, error: data.error || 'Erro ao atualizar perfil' };
       }
 
-      // Atualizar usuário local
       const updatedUser = data.data?.user || data.user;
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -192,7 +185,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // ✅ Recarregar dados do usuário
   const refreshUser = async () => {
     try {
       if (!token) {
@@ -202,8 +194,7 @@ export function AuthProvider({ children }) {
 
       console.log('🔄 Recarregando dados do usuário...');
       
-      // Tentar buscar do endpoint /auth/profile
-      const userResponse = await fetch('http://localhost:3001/api/auth/profile', {
+      const userResponse = await fetch(`${API_BASE_URL}/auth/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -221,10 +212,9 @@ export function AuthProvider({ children }) {
         return { success: true, data: newUser };
       }
 
-      // Se não funcionar, tentar /professionals/me
       console.log('⚠️ /auth/profile não disponível, tentando /professionals/me...');
       
-      const profResponse = await fetch('http://localhost:3001/api/professionals/me', {
+      const profResponse = await fetch(`${API_BASE_URL}/professionals/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -236,7 +226,6 @@ export function AuthProvider({ children }) {
         return { success: false, error: profData.error || 'Erro ao recarregar dados' };
       }
 
-      // Mesclar dados do profissional com o user atual
       const updatedUser = {
         ...user,
         profile_photo: profData.data?.profile_photo || profData.profile_photo
@@ -255,7 +244,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Verificar permissões
   const hasPermission = (permission) => {
     if (!user) return false;
 
@@ -293,7 +281,6 @@ export function AuthProvider({ children }) {
     return permissions[user.user_type]?.includes(permission) || false;
   };
 
-  // Headers com autorização para requests
   const getAuthHeaders = () => {
     return {
       'Content-Type': 'application/json',
@@ -301,7 +288,6 @@ export function AuthProvider({ children }) {
     };
   };
 
-  // Fetch com autenticação
   const authFetch = async (url, options = {}) => {
     const authOptions = {
       ...options,
@@ -313,7 +299,6 @@ export function AuthProvider({ children }) {
 
     const response = await fetch(url, authOptions);
 
-    // Se token expirou, fazer logout
     if (response.status === 401) {
       console.log('🔒 Token expirado, fazendo logout...');
       await logout();

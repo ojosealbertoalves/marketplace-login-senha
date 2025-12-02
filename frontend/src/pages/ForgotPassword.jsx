@@ -3,17 +3,18 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Key, Lock, ArrowLeft, AlertCircle, CheckCircle, Copy } from 'lucide-react';
 import './ForgotPassword.css';
+import { API_BASE_URL } from '../config';
 
 function ForgotPassword() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // 1: email, 2: código, 3: nova senha
+  const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     email: '',
     code: '',
     newPassword: '',
     confirmPassword: ''
   });
-  const [resetCode, setResetCode] = useState(''); // Código gerado pelo backend
+  const [resetCode, setResetCode] = useState('');
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -30,7 +31,6 @@ function ForgotPassword() {
     }
   };
 
-  // PASSO 1: Enviar email
   const handleSubmitEmail = async (e) => {
     e.preventDefault();
     
@@ -43,7 +43,7 @@ function ForgotPassword() {
     setErrors({});
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/forgot-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email })
@@ -52,7 +52,6 @@ function ForgotPassword() {
       const data = await response.json();
 
       if (response.ok) {
-        // ✅ Agora o código NÃO vem mais na resposta
         setStep(2);
         setSuccessMessage('Código enviado para seu email!');
       } else {
@@ -66,7 +65,6 @@ function ForgotPassword() {
     }
   };
 
-  // PASSO 2: Verificar código
   const handleVerifyCode = async (e) => {
     e.preventDefault();
     
@@ -79,7 +77,7 @@ function ForgotPassword() {
     setErrors({});
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/verify-reset-code', {
+      const response = await fetch(`${API_BASE_URL}/auth/verify-reset-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -104,7 +102,6 @@ function ForgotPassword() {
     }
   };
 
-  // PASSO 3: Resetar senha
   const handleResetPassword = async (e) => {
     e.preventDefault();
     
@@ -131,14 +128,14 @@ function ForgotPassword() {
     setErrors({});
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/reset-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           email: formData.email,
           code: formData.code,
           newPassword: formData.newPassword,
-          confirmPassword: formData.confirmPassword // ✅ ADICIONADO!
+          confirmPassword: formData.confirmPassword
         })
       });
 
@@ -168,7 +165,6 @@ function ForgotPassword() {
   return (
     <div className="forgot-password-container">
       <div className="forgot-password-content">
-        {/* Header */}
         <div className="forgot-password-header">
           <Link to="/login" className="back-link">
             <ArrowLeft size={20} />
@@ -193,7 +189,6 @@ function ForgotPassword() {
           </p>
         </div>
 
-        {/* Indicador de progresso */}
         <div className="progress-steps">
           <div className={`step ${step >= 1 ? 'active' : ''}`}>1</div>
           <div className={`step-line ${step >= 2 ? 'active' : ''}`}></div>
@@ -202,7 +197,6 @@ function ForgotPassword() {
           <div className={`step ${step >= 3 ? 'active' : ''}`}>3</div>
         </div>
 
-        {/* Mensagem de sucesso */}
         {successMessage && (
           <div className="success-banner">
             <CheckCircle size={20} />
@@ -210,7 +204,6 @@ function ForgotPassword() {
           </div>
         )}
 
-        {/* Mensagem de erro */}
         {errors.submit && (
           <div className="error-banner">
             <AlertCircle size={20} />
@@ -218,7 +211,6 @@ function ForgotPassword() {
           </div>
         )}
 
-        {/* PASSO 1: Email */}
         {step === 1 && (
           <form onSubmit={handleSubmitEmail} className="forgot-password-form">
             <div className="form-group">
@@ -249,10 +241,8 @@ function ForgotPassword() {
           </form>
         )}
 
-        {/* PASSO 2: Código */}
         {step === 2 && (
           <>
-            {/* ✅ REMOVIDO O DISPLAY DO CÓDIGO - agora só vem por email */}
             <div className="code-instructions">
               <p className="code-hint">
                 📧 Verifique seu email e digite o código de 6 dígitos que você recebeu.
@@ -305,7 +295,6 @@ function ForgotPassword() {
           </>
         )}
 
-        {/* PASSO 3: Nova Senha */}
         {step === 3 && (
           <form onSubmit={handleResetPassword} className="forgot-password-form">
             <div className="form-group">

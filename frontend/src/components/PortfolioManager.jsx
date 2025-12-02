@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import './PortfolioManager.css';
+import { API_BASE_URL } from '../config';
 
 const PortfolioManager = ({ professionalId }) => {
   const { user } = useAuth();
@@ -24,7 +25,7 @@ const PortfolioManager = ({ professionalId }) => {
     images: []
   });
 
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+  const API_URL = API_BASE_URL;
 
   // Carregar portfolio
   useEffect(() => {

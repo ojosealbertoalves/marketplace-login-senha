@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import { states, getCitiesByState } from '../data/locations';
 import './Profile.css';
+import { API_BASE_URL } from '../config';
 
 const Profile = () => {
   const { user, refreshUser } = useAuth();

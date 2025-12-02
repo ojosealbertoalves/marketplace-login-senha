@@ -5,6 +5,7 @@ import { User, Eye, EyeOff, AlertCircle, UserCircle } from 'lucide-react';
 import { register } from '../services/api';
 import { states, getCitiesByState } from '../data/locations';
 import './Register.css';
+import { API_BASE_URL } from '../config';
 
 function Register() {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ function Register() {
   });
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/categories')
+    fetch(`${API_BASE_URL}/categories`)
       .then(res => res.json())
       .then(data => {
         const categoriesArray = Array.isArray(data) ? data : (data.data || []);
@@ -40,7 +41,7 @@ function Register() {
 
   useEffect(() => {
     if (formData.categoryId) {
-      fetch(`http://localhost:3001/api/subcategories?category_id=${formData.categoryId}`)
+      fetch(`${API_BASE_URL}/subcategories?category_id=${formData.categoryId}`)
         .then(res => res.json())
         .then(data => {
           const subcategoriesArray = Array.isArray(data) ? data : (data.data || []);
