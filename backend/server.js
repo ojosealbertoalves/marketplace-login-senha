@@ -1,7 +1,8 @@
-// server.js - Servidor Principal Modularizado COM ANTI-SCRAPING
+// server.js - Servidor Principal Modularizado COM ANTI-SCRAPING E OTIMIZAÇÕES
 
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -21,6 +22,20 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// 🚀 OTIMIZAÇÕES DE PERFORMANCE
+app.use(compression()); // Comprimir respostas
+
+// 🔒 FORÇAR HTTPS EM PRODUÇÃO
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https') {
+      res.redirect(`https://${req.header('host')}${req.url}`);
+    } else {
+      next();
+    }
+  });
+}
+
 // 🛡️ MIDDLEWARES DE SEGURANÇA (ANTES DE TUDO)
 app.use(antiScraping.blockSuspiciousAgents); // Bloquear bots
 app.use(antiScraping.checkReferer); // Verificar origem
@@ -29,7 +44,12 @@ app.use(antiScraping.logSuspiciousActivity); // Registrar suspeitas
 // Middlewares globais
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Cache para arquivos estáticos
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  maxAge: '1d', // Cache por 1 dia
+  etag: true
+}));
 
 // 🛡️ RATE LIMITING GERAL
 app.use('/api', antiScraping.apiRateLimiter);
@@ -39,8 +59,11 @@ app.use('/api', routes);
 
 // 🌐 SERVIR FRONTEND EM PRODUÇÃO
 if (process.env.NODE_ENV === 'production') {
-  // Servir arquivos estáticos do React
-  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+  // Servir arquivos estáticos do React com cache
+  app.use(express.static(path.join(__dirname, '../frontend/dist'), {
+    maxAge: '1d',
+    etag: true
+  }));
   
   // Redirecionar todas as rotas não-API para o index.html do React
   app.get('*', (req, res) => {
@@ -50,6 +73,15 @@ if (process.env.NODE_ENV === 'production') {
 
 // Middleware de tratamento de erros
 app.use(errorHandler);
+
+// 🔄 KEEP-ALIVE PARA RENDER FREE TIER
+if (process.env.NODE_ENV === 'production' && process.env.RENDER_URL) {
+  setInterval(() => {
+    fetch(process.env.RENDER_URL)
+      .then(() => console.log('✅ Keep-alive ping enviado'))
+      .catch(err => console.log('⚠️ Ping falhou:', err.message));
+  }, 14 * 60 * 1000); // Ping a cada 14 minutos
+}
 
 // Iniciar servidor
 app.listen(PORT, async () => {
@@ -83,6 +115,12 @@ app.listen(PORT, async () => {
     console.log('   ✅ User-Agent Detection');
     console.log('   ✅ Referer Check');
     console.log('   ✅ Activity Logging');
+    console.log('🚀 ================================');
+    console.log('⚡ Otimizações Ativas:');
+    console.log('   ✅ Compressão GZIP');
+    console.log('   ✅ Cache de Assets (1 dia)');
+    console.log('   ✅ HTTPS Forçado');
+    console.log('   ✅ Keep-Alive Automático');
     console.log('🚀 ================================');
     console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
     console.log('✅ PRONTO PARA USAR!');
